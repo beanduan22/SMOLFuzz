@@ -1,0 +1,15 @@
+# Goal: computational-graph + mode dependencies, allowed APIs subset.
+Library: PyTorch
+Allowed: ["torch", "torch.nn", "torch.nn.functional", "torch.utils.data",
+          "torch.jit", "torch.cuda", "torch.autograd", "torch.randn",
+          "torch.Tensor.to", "torch.cat", "torch.chunk", "torch.add",
+          "torch.matmul", "torch.nn.Conv2d", "torch.nn.BatchNorm2d",
+          "torch.nn.ReLU", "torch.nn.Dropout2d", "torch.nn.Linear",
+          "torch.optim.SGD", "torch.utils.data.DataLoader"]
+Disallowed: ["torch._C", "network IO"]
+Chain: 12–24
+Dependency types: ["computational-graph","mode"]
+Seed: 1337
+RTOL/ATOL: 1e-4 / 1e-6
+DTYPE: float32
+Runtime: 10

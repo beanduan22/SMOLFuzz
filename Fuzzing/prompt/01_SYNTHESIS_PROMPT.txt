@@ -1,0 +1,32 @@
+Task: Synthesize ONE {TARGET_LIB} model script that exercises LONG and DIVERSE API-dependency chains.
+
+Library: {TARGET_LIB}  # "PyTorch" or "TensorFlow"
+Allowed APIs (must be used; prefer from this set): {API_SET}       # e.g., ["torch.nn.Conv2d", "torch.nn.BatchNorm2d", ...]
+Disallowed APIs (must NOT use): {API_DENYLIST}                     # e.g., ["torch._C", "eager undisclosed", ...]
+Target chain length (APIs on the critical path): >= {MIN_CHAIN} and <= {MAX_CHAIN}
+Dependency types to realize: {DEPENDENCY_TYPES}                    # subset of ["computational-graph","mode","concurrency"]
+Seed: {SEED}                                                       # fix all RNG for determinism
+Device policy: run on both CPU and GPU (if available) with identical inputs; print summary stats from both.
+I/O policy: NO file/network access; synthetic random tensors only.
+Runtime budget per run: <= {RUNTIME_LIMIT_S} sec on a commodity GPU.
+Numerical dtype: {DTYPE}                                          # e.g., float32
+
+HARD CONSTRAINTS:
+1) Model must build and run end-to-end: forward() or call() + a few steps of loss/backprop (if supported).
+2) Realize the requested dependency types:
+   - computational-graph: include branches/joins, multi-op chains, reshape/concat/split, map->reduce style.
+   - mode: include train/eval (or eager/graph) switches and ops whose behavior differs by mode (e.g., dropout/batchnorm or tf.function).
+   - concurrency: include explicit device or stream/async placements producing potential scheduling or ordering effects (e.g., CUDA streams / non_blocking copies in PyTorch; tf.data parallelism or explicit device scopes in TF).
+3) Use ONLY APIs from the allowed set for the core chain; helper utilities may use standard library.
+4) Print: (a) total API calls counted on the main path, (b) a small checksum (mean/std/max) of final tensor(s) for CPU and GPU, (c) whether shapes and numerics match within tolerance.
+5) Determinism: set all relevant seeds and flags; avoid non-deterministic kernels when possible.
+
+SOFT GOALS (if budget allows):
+- Prefer deeper chains over width; avoid trivial linear stacks.
+- Cover tensor creation→view/reshape→arith/lin-alg→stateful layer→reduction pipeline at least once.
+
+VALIDATION ORACLE TO IMPLEMENT IN SCRIPT:
+- Compare CPU vs GPU outputs: same shape, and relative error <= {RTOL} with absolute error <= {ATOL}.
+- Print "SMOLFUZZ_OK" if both checks pass, else "SMOLFUZZ_MISMATCH".
+
+Return ONE complete script only.
