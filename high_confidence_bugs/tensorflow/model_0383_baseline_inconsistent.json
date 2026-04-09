@@ -1,0 +1,22 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 383,
+  "mutation": "baseline",
+  "detail": "l2=2.2796e-03 > threshold=1e-03 finite_elements=2",
+  "used_apis": [
+    "tf.math.special.fresnel_cos",
+    "tf.keras.applications.ResNet50V2",
+    "tf.keras.utils.SequenceEnqueuer",
+    "tf.keras.layers.Conv3DTranspose",
+    "tf.keras.callbacks.ProgbarLogger",
+    "tf.keras.losses.MSE",
+    "tf.keras.layers.experimental.preprocessing.RandomZoom",
+    "tf.math.ndtri",
+    "tf.experimental.numpy.trace",
+    "tf.keras.layers.Resizing",
+    "tf.experimental.numpy.complex128",
+    "tf.experimental.numpy.eye"
+  ],
+  "timestamp": "20260409_233428",
+  "model_file": "/home/binduan/myspace/smolfuzz/results/run_500_tf/models/model_0383.py"
+}

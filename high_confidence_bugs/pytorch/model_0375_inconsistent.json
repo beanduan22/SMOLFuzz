@@ -1,0 +1,25 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 375,
+  "mutation_id": 1,
+  "mutation_name": "add_noise",
+  "cpu_status": "ok",
+  "gpu_status": "ok",
+  "detail": "output[0]: l2=2.4601e+00 > threshold=1e-03 finite_elements=32 shape=[4, 8]",
+  "used_apis": [
+    "torch.nn.Linear",
+    "torch.nn.BatchNorm1d",
+    "torch.nn.functional.dropout",
+    "torch.tanh",
+    "torch.Tensor.sinc_",
+    "torch.linalg.norm",
+    "torch.div"
+  ],
+  "timestamp": "20260410_030631",
+  "artifacts": {
+    "inputs": "bug_inconsistent_m0375_mut1_20260410_030631.inputs.pt",
+    "cpu_outputs": "bug_inconsistent_m0375_mut1_20260410_030631.cpu_out.pt",
+    "gpu_outputs": "bug_inconsistent_m0375_mut1_20260410_030631.gpu_out.pt",
+    "reproducer": "bug_inconsistent_m0375_mut1_20260410_030631.repro.py"
+  }
+}

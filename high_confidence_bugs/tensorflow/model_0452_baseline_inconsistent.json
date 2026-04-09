@@ -1,0 +1,22 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 452,
+  "mutation": "baseline",
+  "detail": "l2=1.0939e-03 > threshold=1e-03 finite_elements=1",
+  "used_apis": [
+    "tf.keras.applications.inception_resnet_v2.preprocess_input",
+    "tf.keras.losses.Loss",
+    "tf.keras.losses.kld",
+    "tf.nn.ctc_beam_search_decoder",
+    "tf.experimental.numpy.moveaxis",
+    "tf.math.reduce_logsumexp",
+    "tf.experimental.numpy.sinh",
+    "tf.experimental.numpy.remainder",
+    "tf.keras.losses.poisson",
+    "tf.experimental.numpy.reshape",
+    "tf.experimental.numpy.subtract",
+    "tf.keras.layers.AvgPool2D"
+  ],
+  "timestamp": "20260410_003708",
+  "model_file": "/home/binduan/myspace/smolfuzz/results/run_500_tf/models/model_0452.py"
+}

@@ -1,0 +1,25 @@
+{
+  "bug_type": "nan",
+  "model_id": 192,
+  "mutation_id": 5,
+  "mutation_name": "scale_large",
+  "cpu_status": "ok",
+  "gpu_status": "ok",
+  "detail": "output[0]: asymmetric non-finite values asym_nan=1 asym_inf=0 nan_vs_inf=0 shape=[4, 8]",
+  "used_apis": [
+    "torch.nn.Linear",
+    "torch.sin",
+    "torch.cos",
+    "torch.logsumexp",
+    "torch.copysign",
+    "torch.log2",
+    "torch.enable_grad"
+  ],
+  "timestamp": "20260409_224553",
+  "artifacts": {
+    "inputs": "bug_nan_m0192_mut5_20260409_224553.inputs.pt",
+    "cpu_outputs": "bug_nan_m0192_mut5_20260409_224553.cpu_out.pt",
+    "gpu_outputs": "bug_nan_m0192_mut5_20260409_224553.gpu_out.pt",
+    "reproducer": "bug_nan_m0192_mut5_20260409_224553.repro.py"
+  }
+}

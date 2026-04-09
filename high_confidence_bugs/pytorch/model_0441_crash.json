@@ -1,0 +1,26 @@
+{
+  "bug_type": "crash",
+  "model_id": 441,
+  "mutation_id": 2,
+  "mutation_name": "scale_small",
+  "cpu_status": "error",
+  "gpu_status": "ok",
+  "detail": "CPU-only crash: Traceback (most recent call last):\n  File \"/home/binduan/myspace/smolfuzz/results/run_500_pytorch/full/workspace/model_0441.py\", line 63, in <module>\n    output = model(*device_inputs)\n  File \"/home/binduan/miniconda3/lib/python3.13/site-packages/torch/nn/modules/module.py\", line 1775, in _wrapped_c",
+  "used_apis": [
+    "torch.nn.Linear",
+    "torch.nn.ReLU",
+    "torch.Tensor.sigmoid_",
+    "torch.logcumsumexp",
+    "torch.nn.functional.adaptive_avg_pool1d",
+    "torch.Tensor.corrcoef",
+    "torch.Tensor.cholesky",
+    "torch.enable_grad"
+  ],
+  "timestamp": "20260410_043056",
+  "artifacts": {
+    "inputs": "bug_crash_m0441_mut2_20260410_043056.inputs.pt",
+    "cpu_outputs": "bug_crash_m0441_mut2_20260410_043056.cpu_out.pt",
+    "gpu_outputs": "bug_crash_m0441_mut2_20260410_043056.gpu_out.pt",
+    "reproducer": "bug_crash_m0441_mut2_20260410_043056.repro.py"
+  }
+}

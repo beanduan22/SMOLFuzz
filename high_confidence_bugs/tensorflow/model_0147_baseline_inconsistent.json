@@ -1,0 +1,22 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 147,
+  "mutation": "baseline",
+  "detail": "l2=1.1008e-03 > threshold=1e-03 finite_elements=1",
+  "used_apis": [
+    "tf.keras.layers.RandomContrast",
+    "tf.keras.losses.mean_absolute_percentage_error",
+    "tf.experimental.numpy.repeat",
+    "tf.nn.conv1d_transpose",
+    "tf.math.greater",
+    "tf.nn.swish",
+    "tf.keras.initializers.LecunNormal",
+    "tf.experimental.numpy.logspace",
+    "tf.experimental.numpy.random.seed",
+    "tf.keras.metrics.TrueNegatives",
+    "tf.experimental.numpy.deg2rad",
+    "tf.linalg.matrix_rank"
+  ],
+  "timestamp": "20260409_200557",
+  "model_file": "/home/binduan/myspace/smolfuzz/results/run_500_tf/models/model_0147.py"
+}

@@ -1,0 +1,22 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 20,
+  "mutation": "baseline",
+  "detail": "l2=9.7942e-03 > threshold=1e-03 finite_elements=1",
+  "used_apis": [
+    "tf.keras.activations.selu",
+    "tf.keras.layers.Normalization",
+    "tf.math.sinh",
+    "tf.sin",
+    "tf.keras.layers.AveragePooling2D",
+    "tf.linalg.LinearOperatorComposition",
+    "tf.nn.avg_pool1d",
+    "tf.keras.layers.PReLU",
+    "tf.keras.applications.ResNet50V2",
+    "tf.math.square",
+    "tf.multiply",
+    "tf.keras.applications.InceptionResNetV2"
+  ],
+  "timestamp": "20260409_170720",
+  "model_file": "/home/binduan/myspace/smolfuzz/results/run_500_tf/models/model_0020.py"
+}

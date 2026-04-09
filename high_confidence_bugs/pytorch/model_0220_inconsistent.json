@@ -1,0 +1,24 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 220,
+  "mutation_id": 3,
+  "mutation_name": "mask",
+  "cpu_status": "ok",
+  "gpu_status": "ok",
+  "detail": "output[0]: integer mismatch (first diff: cpu=(3.230510711669922+0j) gpu=(3.230510950088501+0j))",
+  "used_apis": [
+    "torch.nn.Linear",
+    "torch.tanh",
+    "torch.sin",
+    "torch.cos",
+    "torch.enable_grad",
+    "torch.fft.rfft2"
+  ],
+  "timestamp": "20260409_232608",
+  "artifacts": {
+    "inputs": "bug_inconsistent_m0220_mut3_20260409_232608.inputs.pt",
+    "cpu_outputs": "bug_inconsistent_m0220_mut3_20260409_232608.cpu_out.pt",
+    "gpu_outputs": "bug_inconsistent_m0220_mut3_20260409_232608.gpu_out.pt",
+    "reproducer": "bug_inconsistent_m0220_mut3_20260409_232608.repro.py"
+  }
+}

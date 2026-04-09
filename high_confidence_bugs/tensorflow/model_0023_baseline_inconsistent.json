@@ -1,0 +1,22 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 23,
+  "mutation": "baseline",
+  "detail": "l2=1.0952e-03 > threshold=1e-03 finite_elements=4",
+  "used_apis": [
+    "tf.keras.metrics.mean_squared_logarithmic_error",
+    "tf.linalg.set_diag",
+    "tf.keras.utils.custom_object_scope",
+    "tf.keras.layers.GlobalAveragePooling1D",
+    "tf.experimental.numpy.nanmean",
+    "tf.keras.initializers.variance_scaling",
+    "tf.math.segment_max",
+    "tf.keras.losses.MAPE",
+    "tf.experimental.numpy.maximum",
+    "tf.keras.datasets.fashion_mnist.load_data",
+    "tf.abs",
+    "tf.keras.layers.AdditiveAttention"
+  ],
+  "timestamp": "20260409_171246",
+  "model_file": "/home/binduan/myspace/smolfuzz/results/run_500_tf/models/model_0023.py"
+}

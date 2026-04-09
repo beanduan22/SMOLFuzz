@@ -1,0 +1,22 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 95,
+  "mutation": "baseline",
+  "detail": "l2=1.0915e-03 > threshold=1e-03 finite_elements=4",
+  "used_apis": [
+    "tf.keras.layers.ELU",
+    "tf.nn.avg_pool2d",
+    "tf.experimental.numpy.complex128",
+    "tf.experimental.numpy.tri",
+    "tf.experimental.numpy.zeros_like",
+    "tf.experimental.numpy.complex64",
+    "tf.keras.metrics.mean_absolute_percentage_error",
+    "tf.keras.layers.Dense",
+    "tf.experimental.numpy.asarray",
+    "tf.math.expm1",
+    "tf.keras.layers.Bidirectional",
+    "tf.keras.layers.GlobalAveragePooling2D"
+  ],
+  "timestamp": "20260409_191406",
+  "model_file": "/home/binduan/myspace/smolfuzz/results/run_500_tf/models/model_0095.py"
+}
