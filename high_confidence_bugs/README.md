@@ -1,242 +1,319 @@
-# SMOLFuzz — High-Confidence Bugs
+# High-Confidence Bugs — Minimal Reproducers
 
-**44 confirmed bugs** (42 PyTorch + 2 TensorFlow), all verified on real hardware.  
-Every bug is self-contained in a single `.py` file with inputs embedded as literals — no external files needed.
-
-## Quick Start
-
-```bash
-# Run any single reproducer
-python3 reproducers/bug_pt404.py
-
-# Run all 44 at once
-for f in reproducers/*.py; do
-    echo -n "$(basename $f): "
-    python3 "$f" 2>/dev/null | grep "BUG CONFIRMED\|not reproduced" | head -1
-done
-```
-
-## Bug Summary
-
-| Type | Count | Strongest Signal |
-|---|---|---|
-| CPU crash / GPU ok | 1 | pt441: `cholesky` — CPU throws, GPU returns result |
-| Asymmetric NaN/Inf | 2 | pt192: asym NaN=1; pt396: CPU=Inf, GPU=NaN |
-| Large L2 divergence | 41 | pt404: L2=54,636; pt346: L2=32,768; pt358: L2=739 |
-
-## Tier 1 — Strongest Bugs (10)
-
-| Reproducer | Signal | Key APIs |
-|---|---|---|
-| `bug_pt404.py` | L2=5.4636e+04 | Linear, maximum, sin, cos |
-| `bug_pt346.py` | L2=3.2768e+04 | hann_window, sin, cos |
-| `bug_pt358.py` | L2=7.3856e+02 | Linear, softplus, geqrf (LAPACK vs cuSOLVER) |
-| `bug_pt147.py` | L2=8.3500e+01 | Linear, **BatchNorm1d**, sigmoid, polygamma_ |
-| `bug_pt171.py` | L2=2.0108e+01 | Linear, poisson_nll_loss, BatchNorm1d |
-| `bug_pt241.py` | L2=6.0545e+00 | Linear, ReLU, requires_grad_ |
-| `bug_pt192.py` | ASYM NaN: cpu=16, gpu=17 | sin, cos, logsumexp |
-| `bug_pt396.py` | cpu=Inf / gpu=NaN | LeakyReLU, AbsTransform, ormqr |
-| `bug_pt441.py` | CPU crash / GPU ok | logcumsumexp, corrcoef, cholesky |
-| `bug_tf106.py` | L2=1.4250e+00 (no mutation) | digamma, SeparableConv2D, linalg.inv, mdct |
-
-## Tier 2 — All Other Confirmed Bugs (34)
-
-See [`tier1_tier2_bugs.md`](tier1_tier2_bugs.md) for full table.
-
-## Root Causes
-
-| Root Cause | Count |
-|---|---|
-| **BatchNorm1d**: CPU sequential Welford vs GPU cuDNN parallel tree-reduction | 16 |
-| **Trig pipeline**: sin/cos on large-magnitude inputs loses precision differently on x86 vs CUDA | 18 |
-| **Special math**: logsumexp, erfc, lgamma, xlogy — different CPU/GPU kernel implementations | 5 |
-| **Linear algebra**: LAPACK (CPU) vs cuSOLVER (GPU) — QR factorization and Cholesky | 3 |
-| **TF CPU/GPU kernel divergence**: Eigen vs cuDNN baseline divergence (no mutation needed) | 2 |
-
-## Verified Run Outputs
-
-See [`run_outputs.txt`](run_outputs.txt) — output of all 44 reproducers run on 2026-04-10.  
-All 44 print `BUG CONFIRMED`.
+29 confirmed CPU/GPU divergence bugs found by SMOLFuzz (27 PyTorch + 2 TensorFlow).  
+Each script in `minimal/` is self-contained. Run with:
 
 ```
-=== bug_pt071.py ===
-output[0]: L2=4.4361e-01  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+python3 minimal/<file>.py
+```
 
-=== bug_pt080.py ===
-output[0]: L2=5.9273e-03  shape=[4, 4]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+Requires: PyTorch ≥ 2.1 with CUDA / TensorFlow ≥ 2.13 with GPU.
 
-=== bug_pt101.py ===
-output[0]: L2=1.1677e-02  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+---
 
-=== bug_pt106.py ===
-output[0]: L2=9.0167e-02  shape=[]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+## PyTorch
 
-=== bug_pt125.py ===
-output[0]: L2=2.4522e-01  shape=[1, 4]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt080.py
+```
+CPU: tensor([[-0.9071,  0.5201, -0.3084, -0.0612],
+        [-0.8921,  0.5135, -0.3114, -0.0608],
+        [-0.8870,  0.5167, -0.3471, -0.0778],
+        [-0.8990,  0.5041, -0.3118, -0.0350]])
+GPU: tensor([[-0.9066,  0.5199, -0.3092, -0.0611],
+        [-0.8919,  0.5127, -0.3109, -0.0587],
+        [-0.8863,  0.5151, -0.3470, -0.0755],
+        [-0.8953,  0.5020, -0.3131, -0.0343]])
+L2: 5.9273e-03
+```
 
-=== bug_pt138.py ===
-output[0]: L2=2.0447e+00  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt101.py
+```
+CPU: tensor([[0.8808, 0.7040, 0.3935, 0.5469, 0.8861, 0.9929, 0.7559, 0.6851],
+        [0.8055, 0.8608, 0.8577, 0.8588, 0.6251, 0.8471, 0.7502, 0.1604],
+        [0.9355, 0.9868, 0.5117, 0.3933, 0.4930, 0.3296, 0.9082, 0.3538],
+        [0.9581, 0.2188, 0.8725, 0.2672, 0.9408, 0.3752, 0.6025, 0.4580]])
+GPU: tensor([[0.8816, 0.7040, 0.3932, 0.5483, 0.8868, 0.9936, 0.7581, 0.6855],
+        [0.8056, 0.8608, 0.8578, 0.8591, 0.6249, 0.8475, 0.7500, 0.1604],
+        [0.9382, 0.9858, 0.5103, 0.3909, 0.4890, 0.3261, 0.9075, 0.3568],
+        [0.9591, 0.2135, 0.8736, 0.2615, 0.9405, 0.3759, 0.5995, 0.4574]])
+L2: 1.1677e-02
+```
 
-=== bug_pt144.py ===
-output[0]: L2=3.2524e-03  shape=[4, 1]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt106.py
+```
+CPU: -0.21005144715309143
+GPU: -0.30021804571151733
+L2: 9.0167e-02
+```
 
-=== bug_pt147.py ===
-output[0]: L2=8.3500e+01  shape=[1, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt144.py
+```
+CPU: tensor([[3.1140],
+        [3.1072],
+        [3.1340],
+        [3.1789]])
+GPU: tensor([[3.1163],
+        [3.1077],
+        [3.1340],
+        [3.1767]])
+L2: 3.2524e-03
+```
 
-=== bug_pt162.py ===
-output[0]: L2=4.8801e-02  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt147.py
+```
+CPU: tensor([[3.8083e+00, 2.7262e+00, 2.3084e+02, 3.7534e+00, 1.7628e+01, 1.2490e+00,
+         1.6753e+00, 6.2550e+05]], grad_fn=<StdBackward0>)
+GPU: tensor([[3.8083e+00, 2.7262e+00, 2.3084e+02, 3.7534e+00, 1.7628e+01, 1.2490e+00,
+         1.6753e+00, 6.2542e+05]], grad_fn=<ToCopyBackward0>)
+L2: 8.3500e+01
+```
 
-=== bug_pt171.py ===
-output[0]: L2=2.0108e+01  shape=[4, 4]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt162.py
+```
+CPU: tensor([[  3.7737,  -5.1421,   1.3429, -10.3318,  -6.1362, -10.7523,  -1.5876,
+          -6.6856],
+        [  3.4490,  -4.1753,   1.0060,  -9.2160,  -6.1387,  -9.0726,  -1.7450,
+          -5.2129],
+        [  5.3548,  -5.3407,   1.1778, -11.7782,  -8.5422, -11.9228,  -2.0107,
+          -6.6239],
+        [  6.4592,  -6.1674,   0.8503, -11.5847,  -7.7447, -11.8203,  -0.3796,
+          -5.2477]])
+GPU: tensor([[  3.7790,  -5.1455,   1.3462, -10.3264,  -6.1314, -10.7476,  -1.5837,
+          -6.6794],
+        [  3.4407,  -4.1699,   1.0090,  -9.1930,  -6.1247,  -9.0573,  -1.7425,
+          -5.2106],
+        [  5.3626,  -5.3435,   1.1615, -11.7912,  -8.5443, -11.9300,  -1.9939,
+          -6.6110],
+        [  6.4565,  -6.1698,   0.8474, -11.5835,  -7.7405, -11.8173,  -0.3718,
+          -5.2451]])
+L2: 4.8801e-02
+```
 
-=== bug_pt191.py ===
-output[0]: L2=1.5129e+00  shape=[4, 4]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt192.py
+```
+CPU nan count: 16
+GPU nan count: 17
+Asymmetric NaN positions: 1
+```
 
-=== bug_pt192.py ===
-output[0]: ASYMMETRIC NaN/Inf — cpu_nan=16 gpu_nan=17 cpu_inf=0 gpu_inf=0 asym=1
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt202.py
+```
+CPU: tensor([[-1., -2., -3., -3., -3., -3., -3., -4.],
+        [-1., -2., -2., -2., -2., -2., -2., -2.],
+        [-1., -1., -2., -2., -2., -3., -3., -4.],
+        [ 0., -1., -1., -2., -3., -3., -3., -3.]])
+GPU: tensor([[-1., -2., -3., -3., -3., -3., -3., -3.],
+        [-1., -2., -2., -2., -2., -2., -2., -2.],
+        [-1., -1., -2., -2., -2., -3., -4., -5.],
+        [ 0., -1., -1., -2., -3., -3., -3., -3.]])
+L2: 1.7321e+00
+```
 
-=== bug_pt202.py ===
-output[0]: L2=1.7321e+00  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt236.py
+```
+CPU: tensor([[-2.2647e-01, -3.3944e-01, -2.0624e-02,  1.7951e-01,  3.5358e-01,
+         -3.2568e-01,  3.8695e-01, -1.7783e-01],
+        [-1.2640e-01,  4.0126e-04, -1.3372e-01,  9.4157e-02,  4.4697e-01,
+         -9.3546e-02,  4.5420e-01, -1.7178e-01],
+        [-5.5504e-01, -6.3390e-02,  5.9918e-02, -3.2647e-02,  3.1104e-01,
+         -3.8717e-01,  4.8716e-01, -2.6110e-01],
+        [-4.3359e-01, -2.6134e-01,  2.3560e-01, -1.0253e-01, -1.0838e-01,
+         -4.4473e-01,  1.9012e-01,  1.1912e-01]])
+GPU: tensor([[-0.2429, -0.3293, -0.0070,  0.1902,  0.3347, -0.3314,  0.3884, -0.1572],
+        [-0.1541,  0.0142, -0.1172,  0.0961,  0.4307, -0.0873,  0.4558, -0.1589],
+        [-0.5610, -0.0646,  0.0643, -0.0344,  0.3183, -0.3936,  0.4959, -0.2670],
+        [-0.4385, -0.2672,  0.2363, -0.1088, -0.1118, -0.4477,  0.1852,  0.1198]])
+L2: 6.0033e-02
+```
 
-=== bug_pt236.py ===
-output[0]: L2=6.0033e-02  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt248.py
+```
+CPU: 0.9018270373344421
+GPU: 0.8878859281539917
+L2: 1.3941e-02
+```
 
-=== bug_pt241.py ===
-output[0]: L2=6.0545e+00  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt284.py
+```
+CPU: tensor([[-0.1214, -0.2834,  0.0063,  0.1392,  0.4269, -0.0229,  0.5233, -0.2974],
+        [-0.2650, -0.2688,  0.1975, -0.0007,  0.1449, -0.1530,  0.3913, -0.2823],
+        [-0.2935, -0.2230,  0.1211,  0.0163,  0.1814, -0.1552,  0.3647, -0.2083],
+        [-0.3158, -0.3633,  0.1829, -0.0789,  0.1161, -0.2456,  0.3112, -0.3322]])
+GPU: tensor([[-0.1221, -0.2835,  0.0066,  0.1392,  0.4265, -0.0231,  0.5234, -0.2974],
+        [-0.2639, -0.2750,  0.1939, -0.0081,  0.1438, -0.1589,  0.3842, -0.2839],
+        [-0.2935, -0.2233,  0.1211,  0.0162,  0.1813, -0.1554,  0.3645, -0.2084],
+        [-0.3268, -0.3622,  0.1863, -0.0837,  0.1047, -0.2501,  0.3101, -0.3238]])
+L2: 2.3937e-02
+```
 
-=== bug_pt248.py ===
-output[0]: L2=1.3941e-02  shape=[]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt295.py
+```
+CPU: tensor([[4.2480e-12, 1.0000e+00, 1.8019e-12, 1.0000e+00],
+        [4.2480e-12, 1.0000e+00, 1.8019e-12, 1.0000e+00],
+        [4.2480e-12, 1.0000e+00, 1.8019e-12, 1.0000e+00],
+        [4.2480e-12, 1.0000e+00, 1.8019e-12, 1.0000e+00]])
+GPU: tensor([[0., 0., 0., 0.],
+        [0., 0., 0., 0.],
+        [0., 0., 0., 0.],
+        [0., 0., 0., 0.]])
+L2: 2.8284e+00
+```
 
-=== bug_pt281.py ===
-output[0]: L2=2.3222e+00  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt316.py
+```
+CPU: -1.8474526405334473
+GPU: -1.8546122312545776
+L2: 7.1596e-03
+```
 
-=== bug_pt284.py ===
-output[0]: L2=2.3937e-02  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt319.py
+```
+CPU: tensor([[  18008.1953, -126885.7422,  -65461.8438, -165803.4844, -218747.2344,
+          -26982.2246,  -77856.5000,   74606.8828],
+        [-170746.0000,    5293.2021,  122038.0703,   28405.9160,   13239.1777,
+           13339.5967,   12726.3604,  -51654.0469],
+        [-131083.4375,   29566.8398,   77866.4375, -122364.7344, -108585.0234,
+         -167202.6094, -129276.9062,  -53236.3945],
+        [ -73889.1875, -153102.9688, -128983.8828, -140245.0781, -231608.2656,
+          103543.1328,   26997.8301,  119190.7188]])
+GPU: tensor([[  18008.1738, -126885.7422,  -65461.8438, -165803.4844, -218747.2344,
+          -26982.1934,  -77856.5000,   74606.8828],
+        [-170746.0156,    5293.1860,  122038.0547,   28405.9199,   13239.1797,
+           13339.6006,   12726.3525,  -51654.0430],
+        [-131083.4219,   29566.8691,   77866.3906, -122364.7500, -108585.0547,
+         -167202.6406, -129276.9141,  -53236.3984],
+        [ -73889.1875, -153102.9844, -128983.9062, -140245.0938, -231608.2812,
+          103543.1406,   26997.8418,  119190.7500]])
+L2: 1.0162e-01
+```
 
-=== bug_pt295.py ===
-output[0]: L2=2.8284e+00  shape=[4, 4]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt346.py
+```
+CPU: 311088873472.0
+GPU: 311088840704.0
+L2: 3.2768e+04
+```
 
-=== bug_pt305.py ===
-output[0]: L2=2.7761e-01  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt358.py
+```
+CPU: tensor([[-61661.5664,  36752.4844,  35759.9414, -60571.1484,  -5703.9531,
+          -5498.3188,  -3445.3896, -68115.0938]])
+GPU: tensor([[-61494.3359,  36917.5625,  35526.5898, -60684.1055,  -5196.3232,
+          -5601.2656,  -3566.6458, -68489.3359]])
+L2: 7.3856e+02
+```
 
-=== bug_pt316.py ===
-output[0]: L2=7.1596e-03  shape=[]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt384.py
+```
+CPU: 2.6783676147460938
+GPU: 2.627987861633301
+L2: 5.0380e-02
+```
 
-=== bug_pt319.py ===
-output[0]: L2=1.0162e-01  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt390.py
+```
+CPU: tensor([[0.2640, 0.1789, 0.1059, 0.0595, 0.0597, 0.0565, 0.0198, 0.2557],
+        [0.1240, 0.1930, 0.1618, 0.0495, 0.0363, 0.0352, 0.0153, 0.3848],
+        [0.1042, 0.2835, 0.1199, 0.0663, 0.0529, 0.0503, 0.0316, 0.2913],
+        [0.3139, 0.1218, 0.0509, 0.0345, 0.0822, 0.0190, 0.0104, 0.3673]])
+GPU: tensor([[0.2598, 0.1807, 0.1063, 0.0602, 0.0597, 0.0569, 0.0202, 0.2562],
+        [0.1243, 0.1914, 0.1628, 0.0495, 0.0361, 0.0352, 0.0153, 0.3855],
+        [0.1070, 0.2810, 0.1197, 0.0674, 0.0541, 0.0514, 0.0318, 0.2877],
+        [0.3430, 0.1140, 0.0469, 0.0322, 0.0855, 0.0177, 0.0095, 0.3513]])
+L2: 3.5405e-02
+```
 
-=== bug_pt335.py ===
-output[0]: L2=4.0375e-01  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt396.py
+```
+CPU logdet: -inf
+GPU logdet: -108.34196472167969
+CPU is inf: True GPU is nan: False
+```
 
-=== bug_pt343.py ===
-output[0]: L2=7.8760e-01  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt398.py
+```
+CPU: tensor([[-0.2869, -0.2869, -0.2869, -0.2869, -0.2869, -0.2869, -0.2869, -0.2869],
+        [ 0.1926,  0.5000,  0.2790,  0.2790,  0.2790, -0.3523, -0.3523, -0.3523],
+        [ 0.0987,  0.0987,  0.0987,  0.0987,  0.4910,  0.4910,  0.4910,  0.4910],
+        [ 0.1926,  0.1926,  0.1926, -0.3523, -0.3523, -0.3523, -0.3523, -0.3523]])
+GPU: tensor([[-0.2837, -0.2837, -0.2837, -0.2837, -0.2837, -0.2837, -0.2837, -0.2837],
+        [ 0.1919,  0.5000,  0.2790,  0.2790,  0.2790, -0.3530, -0.3530, -0.3530],
+        [ 0.0977,  0.0977,  0.0977,  0.0977,  0.4908,  0.4908,  0.4908,  0.4908],
+        [ 0.1919,  0.1919,  0.1919, -0.3526, -0.3526, -0.3526, -0.3526, -0.3526]])
+L2: 9.4865e-03
+```
 
-=== bug_pt346.py ===
-output[0]: L2=3.2768e+04  shape=[]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt404.py
+```
+CPU: tensor([[[2.4230e+10, 8.1920e+09, 1.7200e+10, 1.7166e+09, -2.2682e+10, -6.6090e+10, -2.4473e+10, 4.4872e+10],
+         ...]])
+GPU: tensor([[[2.4230e+10, 8.1920e+09, 1.7200e+10, 1.7166e+09, -2.2682e+10, -6.6090e+10, -2.4473e+10, 4.4872e+10],
+         ...]])
+L2: 5.4636e+04
+```
 
-=== bug_pt357.py ===
-output[0]: L2=5.7845e-01  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt424.py
+```
+CPU: -0.1836635172367096
+GPU: -0.17975489795207977
+L2: 3.9086e-03
+```
 
-=== bug_pt358.py ===
-output[0]: L2=7.3856e+02  shape=[1, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt428.py
+```
+CPU: tensor([0.9801, 1.0113, 1.0421, 0.9397, 0.8218, 0.8734, 1.0269, 0.8553])
+GPU: tensor([0.9851, 1.0125, 1.0472, 0.9383, 0.8202, 0.8723, 1.0249, 0.8622])
+L2: 1.0558e-02
+```
 
-=== bug_pt375.py ===
-output[0]: L2=2.4601e+00  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt441.py
+```
+GPU: tensor([1.0000, 1.0006, 1.0015, 1.0018])
+CPU crash: cholesky: The factorization could not be completed because the input is not positive-definite (the leading minor of order 3 is not positive-definite).
+```
 
-=== bug_pt382.py ===
-output[0]: L2=7.1658e-03  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt450.py
+```
+CPU: 3377650.0
+GPU: 3377654.75
+L2: 4.7500e+00
+```
 
-=== bug_pt384.py ===
-output[0]: L2=5.0380e-02  shape=[]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt480.py
+```
+CPU: tensor([[-3.1126, -3.3556, -3.0387, -3.6433, -3.6000, -3.2894, -3.3594, -3.7260],
+        [-3.1983, -3.4623, -3.4381, -3.7616, -3.7230, -3.4614, -3.3585, -3.5012],
+        [-3.3699, -3.4166, -3.3028, -3.4992, -3.7514, -3.4809, -3.3411, -3.8873],
+        [-3.3226, -3.2402, -3.3221, -3.5286, -3.6209, -3.3503, -3.2841, -3.8692]])
+GPU: tensor([[-3.1224, -3.3641, -3.0534, -3.6610, -3.6154, -3.3104, -3.3560, -3.7221],
+        [-3.2158, -3.4534, -3.4298, -3.7615, -3.7328, -3.4684, -3.3547, -3.5142],
+        [-3.3752, -3.4164, -3.3147, -3.4959, -3.7588, -3.4943, -3.3422, -3.8898],
+        [-3.3446, -3.2485, -3.3228, -3.5444, -3.6245, -3.3350, -3.2790, -3.8779]])
+L2: 6.1272e-02
+```
 
-=== bug_pt390.py ===
-output[0]: L2=3.5405e-02  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### pt486.py
+```
+output L2: 3.0295e-03
+grad L2:   1.7158e-03
+```
 
-=== bug_pt396.py ===
-output[0]: ASYMMETRIC NaN/Inf — cpu_nan=0 gpu_nan=1 cpu_inf=1 gpu_inf=0 asym=1
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+---
 
-=== bug_pt398.py ===
-output[0]: L2=9.4865e-03  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+## TensorFlow
 
-=== bug_pt404.py ===
-output[0]: L2=5.4636e+04  shape=[4, 16, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+> These two bugs are hardware-dependent. The L2 values below are from the original discovery run.
 
-=== bug_pt409.py ===
-output[0]: L2=3.4774e-01  shape=[4, 4]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
+### tf067.py
+```
+CPU: [-0.22901464  0.45488286 -2.4911814  -0.22179246]
+GPU: [-0.22896935  0.45494384 -2.4912076  -0.22175983]
+L2: 1.9166e-03
+```
 
-=== bug_pt424.py ===
-output[0]: L2=3.9086e-03  shape=[]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
-
-=== bug_pt428.py ===
-output[0]: L2=1.0558e-02  shape=[8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
-
-=== bug_pt441.py ===
-GPU output: tensor([1.0000, 1.0006, 1.0015, 1.0018])
-CPU crashed: cholesky: The factorization could not be completed because the input is not positive-definite (the leading minor of order 3 is not positive-definite).
-BUG CONFIRMED: GPU succeeds but CPU crashes on the same model and input
-
-=== bug_pt450.py ===
-output[0]: L2=4.7500e+00  shape=[]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
-
-=== bug_pt467.py ===
-output[0]: L2=1.7321e+00  shape=[4, 4]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
-
-=== bug_pt480.py ===
-output[0]: L2=6.1272e-02  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
-
-=== bug_pt486.py ===
-output[0]: L2=3.0295e-03  shape=[4, 8]
-output[1]: L2=1.7158e-03  shape=[4, 8]
-output[2]: L2=3.2102e-03  shape=[4, 8]
-BUG CONFIRMED: CPU and GPU produce different results for the same model and input
-
-=== bug_tf067.py ===
-CPU output[:4]: [-1.9105611  -0.56379056  0.7604368   2.08041   ]
-GPU output[:4]: [-1.9097927 -0.5633421  0.7580898  2.0807762]
-BUG CONFIRMED: L2=2.5365e-03 between CPU and GPU (same model, same input, no mutation)
-
-=== bug_tf106.py ===
-CPU output[:4]: [184.39626]
-GPU output[:4]: [186.85849]
-BUG CONFIRMED: L2=2.4622e+00 between CPU and GPU (same model, same input, no mutation)
+### tf106.py
+```
+CPU: 814.2219...
+GPU: 814.7134...
+L2: 4.9146e-01
 ```
