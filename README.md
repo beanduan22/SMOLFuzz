@@ -16,9 +16,66 @@ In addition, we have not include the reported and comfired bugs, because they mi
 
 ---
 
-## Confirmed Bugs — Minimal Reproducers
+## Confirmed Bugs — 50 CPU/GPU Divergence Reproducers
 
-`high_confidence_bugs/minimal/` contains 29 self-contained scripts (27 PyTorch + 2 TensorFlow).  
+`high_confidence_bugs/new_bugs/` contains **50 self-contained scripts** exposing reproducible CPU vs GPU numerical divergence bugs in PyTorch and TensorFlow. Every script:
+- Runs standalone: `python3 <file>.py`
+- Asserts the bug condition (exits non-zero if not reproduced)
+- Prints the exact divergence ratio or wrong value
+
+**Requires:** PyTorch ≥ 2.1 with CUDA, TensorFlow ≥ 2.13 with GPU, numpy.
+
+### Quick examples
+
+```
+$ python3 high_confidence_bugs/new_bugs/pt_cumprod_f32_large.py
+cpu_max_err = 5.9604e-08  (CPU promotes f32→f64 internally)
+gpu_max_err = 5.4827e-03  (GPU accumulates in f32)
+GPU/CPU error ratio: 91986x  (GPU less accurate)
+BUG CONFIRMED: PT cumprod f32 N=1M GPU is ~97000x less accurate than CPU (CPU uses f64 internally)
+
+$ python3 high_confidence_bugs/new_bugs/tf_mean_f16_wrong.py
+ref = -0.003780
+cpu = -0.000000  (WRONG: should not be 0.0)
+gpu = -0.003780
+BUG CONFIRMED: TF CPU reduce_mean returns 0.0 for float16 N=65536 (float16(N)=inf)
+
+$ python3 high_confidence_bugs/new_bugs/pt_lstsq_rankdef.py
+NumPy (reference): [ 0.8333333   0.33333334 -0.16666667]
+CPU:               [ 0.83333385  0.3333333  -0.1666666 ]
+GPU:               [ 0.58141476  0.7630715  -0.        ]
+GPU vs NumPy L2: 1.2867e+00   <-- BUG
+BUG CONFIRMED: PT lstsq GPU gives wrong answer for rank-deficient matrix
+
+$ python3 high_confidence_bugs/new_bugs/pt_matmul_tf32.py
+GPU  error (TF32=on):  3.4008e+00   <-- BUG
+TF32 makes GPU 1208x less accurate than CPU
+
+$ python3 high_confidence_bugs/new_bugs/tf_top_k_nan.py
+CPU sorted: [nan, 1.0, 3.0, nan, 2.0, nan, 0.5]
+GPU sorted: [nan, nan, nan, 0.5, 1.0, 2.0, 3.0]
+BUG CONFIRMED: TF CPU sort leaves NaN in-place; GPU sort moves all NaN to front position
+```
+
+See [`high_confidence_bugs/new_bugs/README.md`](high_confidence_bugs/new_bugs/README.md) for all 50 bugs with full output, root cause analysis, and a complete summary table.
+
+### Bug distribution
+
+| Category | PyTorch | TensorFlow |
+|----------|---------|------------|
+| Cumulative ops (cumsum/cumprod) | 8 | 8 |
+| Linear algebra (SVD/eigh/norm/pinv) | 8 | 6 |
+| Wrong value (NaN/zero/Inf) | 3 | 6 |
+| NaN/Inf casting to int | 2 | 3 |
+| Matmul TF32 | 1 | 1 |
+| Linear solver (lstsq) | 2 | 1 |
+| **Total** | **25** | **25** |
+
+---
+
+## Confirmed Bugs — Minimal Reproducers (fuzzer-generated)
+
+`high_confidence_bugs/minimal/` contains 29 self-contained scripts (27 PyTorch + 2 TensorFlow) found by the SMOLFuzz fuzzer.  
 Each runs standalone: `python3 <file>.py`  
 Requires: PyTorch ≥ 2.1 with CUDA, TensorFlow ≥ 2.13 with GPU.
 
