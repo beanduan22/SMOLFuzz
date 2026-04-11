@@ -24,8 +24,13 @@ ref = np.linalg.lstsq(A.numpy(), B.numpy(), rcond=None)[0]
 cpu = torch.linalg.lstsq(A, B).solution
 gpu = torch.linalg.lstsq(A.cuda(), B.cuda()).solution.cpu()
 
+cpu_l2 = np.linalg.norm(ref - cpu.numpy())
+gpu_l2 = np.linalg.norm(ref - gpu.numpy())
+
 print("NumPy (reference):", ref[0])
 print("CPU:              ", cpu[0].numpy())
 print("GPU:              ", gpu[0].numpy())
-print(f"CPU vs NumPy L2: {np.linalg.norm(ref - cpu.numpy()):.4e}")
-print(f"GPU vs NumPy L2: {np.linalg.norm(ref - gpu.numpy()):.4e}")
+print(f"CPU vs NumPy L2: {cpu_l2:.4e}")
+print(f"GPU vs NumPy L2: {gpu_l2:.4e}   <-- BUG")
+assert gpu_l2 > 0.5, f"GPU should give wrong answer for rank-deficient input, got L2={gpu_l2:.4e}"
+print(f"BUG CONFIRMED: PT lstsq GPU gives wrong answer for rank-deficient matrix (L2={gpu_l2:.4e} vs CPU L2={cpu_l2:.4e})")

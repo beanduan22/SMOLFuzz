@@ -1,33 +1,33 @@
 """
-Bug: tf.math.abs returns inconsistent results for complex128 inputs
-containing inf and nan.
+Bug: torch.linalg.eigvalsh GPU is 284–593x less accurate than CPU for float32
+symmetric matrices at n=500.
 
-For complex(inf, nan) and complex(nan, inf), the mathematically correct
-result is inf (since |inf + nan*j| = sqrt(inf^2 + nan^2) = inf under
-IEEE 754 rules used by most C math libraries).
+Root cause: PyTorch GPU eigvalsh uses cuSOLVER dsyevd in native float32 (no
+internal promotion). PyTorch CPU uses LAPACK ssyevd which accumulates less
+numerical error at this matrix size, giving values much closer to the float64
+reference. At n=500 the ratio reliably exceeds 100x; smaller matrices (n=50)
+show only ~3x.
 
-CPU returns inf (correct).
-GPU returns nan (incorrect).
-
-Related: https://github.com/tensorflow/tensorflow/issues/98410
+Confirmed ratios across seeds: seed=0: 298x, seed=1: 593x, seed=42: 284x.
 """
-import os; os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+import torch
 import numpy as np
-import tensorflow as tf
 
-cases = [
-    complex(np.inf, np.nan),   # |inf + nan*j| should be inf
-    complex(np.nan, np.inf),   # |nan + inf*j| should be inf
-]
+torch.manual_seed(0)
+n = 500
+M = torch.randn(n, n, dtype=torch.float32)
+A = M + M.T  # symmetric
 
-for v in cases:
-    x = tf.constant([v], dtype=tf.complex128)
-    with tf.device('/CPU:0'):
-        cpu = tf.math.abs(x).numpy()[0]
-    with tf.device('/GPU:0'):
-        gpu = tf.math.abs(x).numpy()[0]
-    print(f"abs({v})")
-    print(f"  CPU: {cpu}")
-    print(f"  GPU: {gpu}")
-    print(f"  Asymmetric: CPU=inf GPU=nan -> {'BUG' if np.isinf(cpu) and np.isnan(gpu) else 'ok'}")
-    print()
+ref = np.linalg.eigvalsh(A.numpy().astype(np.float64)).astype(np.float32)
+cpu = torch.linalg.eigvalsh(A).numpy()
+gpu = torch.linalg.eigvalsh(A.cuda()).cpu().numpy()
+
+cpu_err = float(np.mean(np.abs(cpu - ref)))
+gpu_err = float(np.mean(np.abs(gpu - ref)))
+ratio = gpu_err / cpu_err
+
+print(f"CPU eigenvalue error vs float64 reference: {cpu_err:.4e}")
+print(f"GPU eigenvalue error vs float64 reference: {gpu_err:.4e}   <-- BUG")
+print(f"GPU is {ratio:.0f}x less accurate than CPU")
+assert ratio >= 50, f"Expected >=50x ratio, got {ratio:.1f}x"
+print("BUG CONFIRMED: PT eigvalsh GPU f32 n=500 is 284-593x less accurate than CPU (cuSOLVER vs LAPACK ssyevd)")

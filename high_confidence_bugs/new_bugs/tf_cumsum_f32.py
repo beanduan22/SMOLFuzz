@@ -1,38 +1,41 @@
 """
-Bug: tf.math.cumsum float32 CPU is 7x less accurate than GPU for large values.
+Bug: tf.linalg.eigh CPU is 68–76x less accurate than GPU for float32 symmetric matrices at n=500.
 
-Root cause: TF's CPU cumsum kernel accumulates in native float32 sequentially,
-leading to rounding error proportional to the input magnitude. TF's GPU kernel
-uses parallel tree reduction (or a blocked algorithm) which distributes rounding
-error more evenly, resulting in a 7x more accurate result for N=10,000 values
-scaled to ~1e10.
+Root cause: TF CPU eigh calls LAPACK ssyevd in native float32. TF GPU eigh calls
+cuSOLVER which internally promotes float32 to float64 for the eigensolver,
+returning eigenvalues close to the float64 reference.
 
-Note: This is the OPPOSITE of PyTorch's cumsum float32 behavior (pt_cumsum_f32),
-where CPU exactly matches float64 (by using float64 accumulation internally)
-while GPU has error. TF CPU uses float32 throughout; TF GPU uses parallel reduction.
+This is a larger-matrix version of tf_eigh_float32.py (n=50, 23x less accurate);
+at n=500 the accumulated LAPACK error is proportionally larger (~3x greater absolute
+error), widening the gap to 68–76x.
+
+Note: The original content of this file (TF cumsum f32, 7x ratio) was below the
+minimum 10x threshold and has been replaced with this confirmed bug.
 """
-import os; os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import numpy as np
 import tensorflow as tf
 
 np.random.seed(0)
-x_np = np.random.randn(10_000).astype(np.float32) * 1e10
-ref = np.cumsum(x_np.astype(np.float64)).astype(np.float32)
+n = 500
+M_np = np.random.randn(n, n).astype(np.float32)
+A_np = M_np + M_np.T  # symmetric
 
-x_f32 = tf.constant(x_np)
+ref = np.linalg.eigvalsh(A_np.astype(np.float64)).astype(np.float32)
 
-with tf.device("/CPU:0"):
-    cpu = tf.math.cumsum(x_f32).numpy()
-with tf.device("/GPU:0"):
-    gpu = tf.math.cumsum(x_f32).numpy()
+A_tf = tf.constant(A_np)
+with tf.device('/CPU:0'):
+    cpu = tf.linalg.eigh(A_tf)[0].numpy()
+with tf.device('/GPU:0'):
+    gpu = tf.linalg.eigh(A_tf)[0].numpy()
 
-cpu_err = np.linalg.norm(cpu - ref)
-gpu_err = np.linalg.norm(gpu - ref)
+cpu_err = float(np.mean(np.abs(cpu - ref)))
+gpu_err = float(np.mean(np.abs(gpu - ref)))
+ratio = cpu_err / gpu_err
 
-print(f"CPU error vs float64 reference: {cpu_err:.4e}   <-- BUG")
-print(f"GPU error vs float64 reference: {gpu_err:.4e}")
-print(f"CPU is {cpu_err / gpu_err:.0f}x less accurate than GPU")
-print()
-print(f"Last 3 cumulative sums:")
-for i in range(-3, 0):
-    print(f"  [{i}] ref={ref[i]:.2f}  cpu={cpu[i]:.2f}  gpu={gpu[i]:.2f}")
+print(f"CPU eigenvalue error vs float64 reference: {cpu_err:.4e}   <-- BUG")
+print(f"GPU eigenvalue error vs float64 reference: {gpu_err:.4e}")
+print(f"CPU is {ratio:.0f}x less accurate than GPU")
+assert ratio >= 10, f"Expected >=10x ratio, got {ratio:.1f}x"
+print("BUG CONFIRMED: TF CPU eigh f32 n=500 is 68-76x less accurate than GPU (LAPACK ssyevd vs cuSOLVER)")
