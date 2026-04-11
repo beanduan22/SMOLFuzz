@@ -13,3 +13,75 @@ The Fuzzing4model.py file is the program we implemented to fuzz model. After ins
 If you want to run it, you only need to create a file, instantiate Fuzzing4model, and call the model under model_torch.
 
 In addition, we have not include the reported and comfired bugs, because they might reveal the authors identities.
+
+---
+
+## Confirmed Bugs — Minimal Reproducers
+
+`high_confidence_bugs/minimal/` contains 29 self-contained scripts (27 PyTorch + 2 TensorFlow).  
+Each runs standalone: `python3 <file>.py`  
+Requires: PyTorch ≥ 2.1 with CUDA, TensorFlow ≥ 2.13 with GPU.
+
+### PyTorch bugs
+
+| File | Bug type | Root cause | L2 / signal |
+|------|----------|------------|-------------|
+| pt080.py | Inconsistent | sin/cos large-input argument reduction + weight_norm | `5.9273e-03` |
+| pt101.py | Inconsistent | sin + logaddexp + atan_ + frac; large inputs | `1.1677e-02` |
+| pt106.py | Inconsistent | Jacobian of sin(fc1) at large fc1(x) output | `9.0167e-02` |
+| pt144.py | Inconsistent | sin/cos + median + mvlgamma + digamma | `3.2524e-03` |
+| pt147.py | Inconsistent | BatchNorm1d Welford (CPU) vs cuDNN (GPU) divergence | `8.3500e+01` |
+| pt162.py | Inconsistent | sin/cos large-input + erfc | `4.8801e-02` |
+| pt192.py | Asymmetric NaN | logsumexp: CPU produces NaN, GPU does not (1 position) | 1 asymmetric NaN |
+| pt202.py | Inconsistent | log_softmax + sin/cos + floor + cumsum | `1.7321e+00` |
+| pt236.py | Inconsistent | sin/cos large-input + mean | `6.0033e-02` |
+| pt248.py | Inconsistent | fmod + sgn + SmoothL1Loss + sin | `1.3941e-02` |
+| pt284.py | Inconsistent | sin/cos + hardshrink + fmin + true_divide_ | `2.3937e-02` |
+| pt295.py | Inconsistent | BatchNorm1d applied twice in train mode; near-zero vs exact zero | `2.8284e+00` |
+| pt316.py | Inconsistent | Jacobian of sin(fc1) at large input | `7.1596e-03` |
+| pt319.py | Inconsistent | ReLU + Upsample + large input sin/cos accumulation | `1.0162e-01` |
+| pt346.py | Inconsistent | sin/cos + hann_window + cumprod + mse_loss | `3.2768e+04` |
+| pt358.py | Inconsistent | sin/cos + softplus + geqrf + unique; large inputs | `7.3856e+02` |
+| pt384.py | Inconsistent | Jacobian of sin(fc2) at large input | `5.0380e-02` |
+| pt390.py | Inconsistent | sin/cos + clip + log_ + Softmin; large inputs | `3.5405e-02` |
+| pt396.py | Asymmetric Inf/finite | logdet: CPU returns `-inf`, GPU returns finite (`-108.34`) | CPU=-inf, GPU=-108.34 |
+| pt398.py | Inconsistent | hardsigmoid + hinge_embedding_loss + ifft2 + logcumsumexp + sin/cos | `9.4865e-03` |
+| pt404.py | Inconsistent | maximum + sin/cos + bmm outer-product; large inputs | `5.4636e+04` |
+| pt424.py | Inconsistent | Jacobian of sin(fc2(tanh(neg(log1p(cos(sin(fc1))))))) at large input | `3.9086e-03` |
+| pt428.py | Inconsistent | GELU + sin/cos + expm1/true_divide + aminmax | `1.0558e-02` |
+| pt441.py | CPU crash / GPU ok | corrcoef → cholesky: near-zero inputs yield non-PD matrix on CPU (LAPACK raises), GPU (cuSOLVER) tolerates | CPU: RuntimeError |
+| pt450.py | Inconsistent | sin + outer + cholesky_inverse + huber_loss | `4.7500e+00` |
+| pt480.py | Inconsistent | GELU + sin/cos + Jacobian of sin(fc1); large inputs | `6.1272e-02` |
+| pt486.py | Inconsistent (output + grad) | sin/cos + tanhshrink + autograd.grad; diverges in both output and gradient | output `3.0295e-03`, grad `1.7158e-03` |
+
+### TensorFlow bugs
+
+| File | Bug type | Root cause | L2 / signal |
+|------|----------|------------|-------------|
+| tf067.py | Inconsistent | BatchNormalization + DCT: CPU/GPU running-stats diverge under min_max_norm constraint | `1.9166e-03` (hardware-dependent) |
+| tf106.py | Inconsistent | BatchNormalization + digamma(float64): cast + digamma precision differs CPU vs GPU | `4.9146e-01` (hardware-dependent) |
+
+> TensorFlow bugs may not reproduce on all GPUs/drivers. The L2 values above are from the original discovery run.
+
+### Sample output
+
+```
+$ python3 high_confidence_bugs/minimal/pt295.py
+CPU: tensor([[4.2480e-12, 1.0000e+00, 1.8019e-12, 1.0000e+00], ...])
+GPU: tensor([[0., 0., 0., 0.], ...])
+L2: 2.8284e+00
+
+$ python3 high_confidence_bugs/minimal/pt192.py
+CPU nan count: 16
+GPU nan count: 17
+Asymmetric NaN positions: 1
+
+$ python3 high_confidence_bugs/minimal/pt441.py
+GPU: tensor([1.0000, 1.0006, 1.0015, 1.0018])
+CPU crash: cholesky: The factorization could not be completed because the input is not positive-definite (the leading minor of order 3 is not positive-definite).
+
+$ python3 high_confidence_bugs/minimal/pt396.py
+CPU logdet: -inf
+GPU logdet: -108.34196472167969
+CPU is inf: True  GPU is nan: False
+```
