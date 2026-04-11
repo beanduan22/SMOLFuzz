@@ -1,7 +1,8 @@
 # New Bugs — Confirmed CPU/GPU Divergence
 
-11 real bugs found by searching PyTorch and TensorFlow issue trackers and reproducing on current versions.
-These are **not floating-point noise** — they are wrong algorithms or missing IEEE 754 handling.
+15 real bugs confirmed across PyTorch and TensorFlow.
+Sources: PyTorch/TensorFlow issue trackers + cross-verified from JAX (#22557), PaddlePaddle (#72779), and MXNet (#9555).
+These are **not floating-point noise** — they are wrong algorithms, undefined-behavior exploitation, or missing IEEE 754 handling.
 
 Run with: `python3 <file>.py`
 Requires: PyTorch ≥ 2.1 with CUDA / TensorFlow ≥ 2.13 with GPU.
@@ -183,4 +184,69 @@ CPU error vs float64 reference: 1.0686e+02
 GPU error vs float64 reference: 9.1100e+00
 CPU is 11.7x less accurate than GPU
 CPU vs GPU L2: 1.0696e+02
+```
+
+---
+
+## Cross-Framework Bugs (found in JAX/PaddlePaddle/MXNet, verified in PyTorch/TensorFlow)
+
+### pt_cast_nan_inf.py — `float32(nan/inf)` → `int32/int64` CPU vs GPU different results
+
+**Origin:** PaddlePaddle issue #72779 (float32(NaN)->int32 gives CPU=INT32_MIN, GPU=0). Same bug confirmed in PyTorch.
+
+**Root cause:** C and CUDA standards both leave float-to-int conversion for NaN/Inf as **undefined behavior**. x86 `CVTTSS2SI` saturates to `INT_MIN` for any out-of-range value. CUDA's float-to-int returns 0 for NaN and `INT_MAX` for +Inf — opposite saturation semantics.
+
+```
+float32(nan)  -> int32:  CPU=-2147483648  GPU=0               -> BUG
+float32(inf)  -> int32:  CPU=-2147483648  GPU=2147483647       -> BUG
+float32(inf)  -> int64:  CPU=-9223372036854775808  GPU=9223372036854775807  -> BUG
+```
+
+---
+
+### tf_cast_nan_inf.py — Same bug in TensorFlow
+
+**Origin:** Same PaddlePaddle #72779. Confirmed in TF.
+
+```
+float32(nan)  -> int32:  CPU=-2147483648  GPU=0               -> BUG
+float32(inf)  -> int32:  CPU=-2147483648  GPU=2147483647       -> BUG
+float32(inf)  -> int64:  CPU=-9223372036854775808  GPU=9223372036854775807  -> BUG
+```
+
+---
+
+### pt_matmul_tf32.py — `torch.matmul` with TF32 is 1208× less accurate than CPU
+
+**Origin:** JAX issue #22557 (jnp.einsum GPU 70x less accurate due to reduced matmul precision). PyTorch has the same bug with a larger gap.
+
+**Root cause:** NVIDIA Ampere+ GPUs support TF32 which reduces float32 mantissa from 23 bits to 10 bits in matrix multiplications. `torch.backends.cuda.matmul.allow_tf32 = True` is the **default** on Ampere+. CPU always uses full float32, creating a silent 1208x accuracy gap.
+
+```
+CPU  error vs float64 reference: 2.8160e-03
+GPU  error (TF32=off):           2.4148e-03
+GPU  error (TF32=on):            3.4008e+00   <-- BUG
+TF32 makes GPU 1208x less accurate than CPU
+
+First 4 output values:
+  ref:      [34.167099, -0.626520, 2.158956, -7.296951]
+  cpu:      [34.167099, -0.626529, 2.158953, -7.296947]
+  gpu_tf32: [34.161766, -0.628163, 2.151218, -7.299671]
+```
+
+---
+
+### tf_matmul_tf32.py — `tf.matmul` GPU is 1011× less accurate than CPU
+
+**Origin:** Same JAX issue #22557. TF uses cuBLAS TF32 on Ampere+ with no user-accessible flag to disable it.
+
+```
+CPU error vs float64 reference: 3.3549e-03
+GPU error vs float64 reference: 3.3903e+00   <-- BUG
+GPU is 1011x less accurate than CPU (TF32 TensorCore)
+
+First 4 output values:
+  ref: [8.810464, 19.309502, -2.176206, -2.222901]
+  cpu: [8.810467, 19.309511, -2.176223, -2.222898]
+  gpu: [8.810652, 19.299034, -2.163798, -2.212879]
 ```
