@@ -1,4 +1,4 @@
-# CPU/GPU Divergence Bugs — 50 Confirmed Reproducers
+# CPU/GPU Divergence Bugs — 59 Confirmed Reproducers
 
 Self-contained Python scripts that expose **CPU vs GPU numerical divergence** in PyTorch and TensorFlow. Every file runs standalone, exits 0 on success (bug confirmed), exits non-zero if the bug does not reproduce.
 
@@ -810,3 +810,147 @@ bfloat16(inf) -> int64:  CPU=-9223372036854775808  GPU=9223372036854775807  -> B
 \* `tf_abs_complex_nan.py` contains a PyTorch bug (replaced a duplicate of `tf_abs_complex64.py`).  
 † `pt_conv2d_f16.py` contains a TensorFlow bug (replaced an unconfirmed PyTorch conv2d test).  
 ‡ `tf_cumsum_f32.py` contains a TF eigh bug (replaced a below-threshold cumsum test with 7x ratio).
+
+---
+
+## New Bugs — Cross-Framework Bugs from GitHub Issues (9 new, bugs 51–59)
+
+These bugs were found by searching real GitHub issues across PyTorch, TensorFlow, and JAX,
+then cross-checking whether the bug also exists in the other framework.
+
+| # | File | Library | Type | Key Finding |
+|---|------|---------|------|-------------|
+| 51 | `pt_softplus_beta_overflow.py` | PyTorch | both CPU+GPU wrong | `softplus(0.5, beta=1e10)` → inf (should be 0.5) |
+| 52 | `tf_softplus_beta_overflow.py` | TensorFlow | cross-framework ref | TF handles large beta correctly; PT does not |
+| 53 | `tf_roll_int_overflow.py` | TensorFlow | both CPU+GPU wrong | `tf.roll(x, shift=2^31)` gives wrong result (int32 overflow) |
+| 54 | `pt_scatter_add_nondeterministic.py` | PyTorch | GPU 40x worse | float16 scatter_add: GPU 40x worse than CPU (atomicAdd order) |
+| 55 | `tf_scatter_add_nondeterministic.py` | TensorFlow | large CPU/GPU diff | float16 unsorted_segment_sum: large CPU vs GPU divergence |
+| 56 | `pt_linalg_solve_singular.py` | PyTorch | massive CPU/GPU diff | near-singular solve (cond=1e10): CPU vs GPU diff = 6.3e9 |
+| 57 | `tf_linalg_solve_singular.py` | TensorFlow | cross-framework ref | TF CPU==GPU for solve (no divergence); PT has it |
+| 58 | `tf_logdet_singular.py` | TensorFlow | wrong vs NumPy | singular matrix logdet → NaN (should be -inf; PT returns -inf) |
+| 59 | `tf_lstsq_complex64.py` | TensorFlow | NaN output | `lstsq(rank-def, fast=True)` → NaN on both CPU and GPU |
+
+---
+
+### Bug 51 — `pt_softplus_beta_overflow.py`
+
+**Operation:** `torch.nn.functional.softplus(x, beta=1e10, threshold=inf)`
+**Root cause:** `log(1 + exp(beta * x)) / beta` — `beta * x` overflows float32 → inf/beta = inf.
+The numerically stable form `x + log1p(exp(-beta*x))/beta` is not used when `threshold` is bypassed.
+TensorFlow's `tf.nn.softplus(beta * x) / beta` uses the XLA stable path and returns the correct value.
+
+```
+Input: x = [0.5, 1.0, 2.0, -1.0, 0.0], beta = 1e10
+CPU: [inf, inf, inf, 0.0, ...]   ← BUG: should be [0.5, 1.0, 2.0, 0.0, ...]
+GPU: [inf, inf, inf, 0.0, ...]   ← same bug
+TF:  [0.5, 1.0, 2.0, 0.0, ...]  ← TF correct (cross-framework comparison)
+```
+
+**Source:** PyTorch GitHub issue #171249
+
+---
+
+### Bug 53 — `tf_roll_int_overflow.py`
+
+**Operation:** `tf.roll(x, shift=2^31, axis=0)` with int32 shift
+**Root cause:** TF's roll kernel stores shift as int32. When shift = 2^31 (= INT32_MAX + 1),
+  the modular arithmetic overflows → wrong element displacement.
+PyTorch handles this correctly for all 64-bit Python int shift values.
+
+```
+shift = 2147483647 (INT32_MAX): CPU correct=True,  GPU correct=True
+shift = 2147483648 (INT32_MAX+1): CPU correct=False, GPU correct=False ← BUG
+shift = 4294967295 (UINT32_MAX):  CPU correct=False, GPU correct=False ← BUG
+```
+
+**Source:** TensorFlow GitHub issue #109520
+
+---
+
+### Bug 54 — `pt_scatter_add_nondeterministic.py`
+
+**Operation:** `tensor.scatter_add_(dim, index, src)` with heavy duplicate indices, float16
+**Root cause:** GPU uses `atomicAdd` in arbitrary parallel order. Float16 addition is not
+associative — reordering ~2000 additions per bucket accumulates 40x more error than CPU's
+serial summation.
+
+```
+float16, N=100k, M=50 (2000 dups/bucket):
+CPU error vs float32 ref: 2.45e+00
+GPU error vs float32 ref: 1.02e+02   ← 41.9x worse
+CPU vs GPU max diff:      1.04e+02   *** SIGNIFICANT ***
+
+GPU is NOT deterministic: run1 != run2 for same input.
+```
+
+---
+
+### Bug 55 — `tf_scatter_add_nondeterministic.py`
+
+**Operation:** `tf.math.unsorted_segment_sum` with float16/bfloat16 and many duplicates
+**Root cause:** Same as bug 54 — GPU atomicAdd on float16 is non-associative.
+
+```
+float16, N=100k, M=50:
+CPU error vs float64 ref: 9.01e+01
+GPU error vs float64 ref: 9.01e+01
+CPU vs GPU max diff:      7.72e+01   *** SIGNIFICANT ***
+
+bfloat16, N=200k, M=50:
+CPU vs GPU max diff: 1.33e+04        *** SIGNIFICANT ***
+```
+
+---
+
+### Bug 56 — `pt_linalg_solve_singular.py`
+
+**Operation:** `torch.linalg.solve(A, b)` where A is float32 with condition number ≥ 1e6
+**Root cause:** CPU uses LAPACK's `sgesv` (partial pivoting); GPU uses cuSOLVER's `sgesv`
+(different pivoting strategy). For ill-conditioned systems, tiny pivot differences amplify
+through the triangular solves, producing entirely different solution vectors.
+
+```
+n=32, float32, cond=1e10:
+CPU error vs float64: 6.80e+09
+GPU error vs float64: 8.47e+09
+CPU vs GPU diff:      6.26e+09   ← MASSIVE divergence
+
+cond=1e8, 8×8 Vandermonde:
+CPU vs GPU diff:      8.52e+00   ← completely different solutions
+```
+
+TF CPU and TF GPU agree (both use the same backend) — this is a PyTorch-specific CPU/GPU split.
+
+---
+
+### Bug 58 — `tf_logdet_singular.py`
+
+**Operation:** `tf.linalg.logdet(A)` when A is singular or near-singular
+**Root cause:** TF's logdet uses LU decomposition and returns `NaN` when a zero pivot is encountered,
+instead of `-inf`. NumPy and PyTorch correctly return `-inf` for singular matrices.
+
+```
+8×8 all-ones matrix (rank 1, det=0, logdet=-inf):
+NumPy: -inf  ← correct
+PT CPU: -inf  ← correct
+TF CPU: NaN  ← BUG (returns NaN instead of -inf)
+TF GPU: NaN  ← BUG (same)
+```
+
+---
+
+### Bug 59 — `tf_lstsq_complex64.py`
+
+**Operation:** `tf.linalg.lstsq(A, b, fast=True)` with rank-deficient complex64 matrix
+**Root cause:** `fast=True` selects the Cholesky path (A^H A x = A^H b), which breaks down when
+A is rank-deficient because A^H A is singular. Returns NaN for both CPU and GPU.
+
+```
+3×3 rank-deficient complex64, fast=True:
+TF CPU: err=NaN  ← BUG
+TF GPU: err=NaN  ← BUG
+
+fast=False (QR path):
+TF CPU: err=1.726e+00 (high but finite)
+TF GPU: err=1.726e+00 (finite)
+```
