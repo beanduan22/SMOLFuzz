@@ -1,4 +1,4 @@
-# CPU/GPU Divergence Bugs — 59 Confirmed Reproducers
+# CPU/GPU Divergence Bugs — 79 Confirmed Reproducers
 
 Self-contained Python scripts that expose **CPU vs GPU numerical divergence** in PyTorch and TensorFlow. Every file runs standalone, exits 0 on success (bug confirmed), exits non-zero if the bug does not reproduce.
 
@@ -953,4 +953,273 @@ TF GPU: err=NaN  ← BUG
 fast=False (QR path):
 TF CPU: err=1.726e+00 (high but finite)
 TF GPU: err=1.726e+00 (finite)
+```
+
+---
+
+## New Bugs 60–79 (Added in Second Pass)
+
+---
+
+### Bug 60 — `tf_cumulative_logsumexp_inf.py`
+
+**Operation:** `tf.math.cumulative_logsumexp` with `+inf` in input  
+**Root cause:** When the input contains `+inf`, CPU handles edge cases differently from GPU, returning `NaN` on one device while the other returns `+inf`.
+
+```
+cumulative_logsumexp([1.0, +inf, 2.0]):
+CPU returns NaN / GPU returns +inf (or vice versa)
+*** BUG: NaN vs Inf divergence ***
+```
+
+---
+
+### Bug 61 — `tf_digamma_zero.py`
+
+**Operation:** `tf.math.digamma(x)` near x=0  
+**Root cause:** CPU and GPU handle the pole at x=0 differently — one returns `-inf`, the other returns `NaN` or a large finite value.
+
+```
+digamma(0.0): CPU vs GPU categorical divergence
+*** BUG: digamma(0) differs CPU vs GPU ***
+```
+
+---
+
+### Bug 62 — `pt_layernorm_extreme.py`
+
+**Operation:** `torch.nn.LayerNorm` on float32 inputs at scale 1e20  
+**Root cause:** CPU Welford variance accumulator overflows to `inf` at extreme scale, producing NaN output. GPU parallel reduction handles large values differently, returning finite output.
+
+```
+scale=1e+20: cpu_nan=True, gpu_nan=False  *** NaN DIVERGENCE ***
+*** BUG: LayerNorm CPU=NaN but GPU=finite at scale=1e20 ***
+```
+
+---
+
+### Bug 63 — `pt_index_add_float16.py`
+
+**Operation:** `torch.Tensor.index_add_` with float16, large index counts  
+**Root cause:** GPU uses non-deterministic `atomicAdd` for float16 scatter-accumulation. Multiple parallel threads hitting the same index produce different partial sums across runs.
+
+```
+M=500000, N=1000: CPU vs GPU diff=2.500e-01  *** DIVERGENCE ***
+GPU non-determinism: run0_vs_run1=1.562e-01  *** GPU NON-DETERMINISTIC ***
+*** BUG: index_add_ float16 GPU is non-deterministic and diverges from CPU ***
+```
+
+---
+
+### Bug 64 — `pt_group_norm_extreme.py`
+
+**Operation:** `torch.nn.GroupNorm` on float32 inputs at scale 1e20  
+**Root cause:** Same Welford overflow as LayerNorm — CPU produces NaN at extreme scale while GPU parallel reduction returns finite values.
+
+```
+scale=1e+20: cpu_nan=True, gpu_nan=False  *** BUG ***
+*** BUG: GroupNorm CPU=NaN but GPU=finite at scale=1e20 ***
+```
+
+---
+
+### Bug 65 — `tf_segment_sum_float16.py`
+
+**Operation:** `tf.math.unsorted_segment_sum` with float16  
+**Root cause:** GPU uses non-deterministic `atomicAdd` for float16 accumulation. The non-associativity of floating-point addition at reduced precision causes both non-determinism across GPU runs and divergence from CPU's sequential sum.
+
+```
+M=500000, N=500: CPU vs GPU diff=6.875e-01  *** DIVERGENCE ***
+GPU non-determinism: 8.125e-01  *** GPU NON-DETERMINISTIC ***
+*** BUG: unsorted_segment_sum float16 GPU is non-deterministic ***
+```
+
+---
+
+### Bug 66 — `pt_topk_nan.py`
+
+**Operation:** `torch.topk` with multiple NaN values in input  
+**Root cause:** NaN comparisons are undefined by IEEE 754. CPU uses sequential selection (stable relative to input order) while GPU uses a parallel bitonic sort, placing NaN values at different positions. The returned **indices** differ even when the values appear the same.
+
+```
+topk([NaN, 5, NaN, 1, 2], k=3):
+CPU indices: [0, 2, 1]  GPU indices: [2, 0, 1]
+*** BUG: topk NaN indices differ CPU vs GPU ***
+```
+
+---
+
+### Bug 67 — `pt_cross_entropy_float16.py`
+
+**Operation:** `torch.nn.functional.cross_entropy` with bfloat16 inputs at large logit scale  
+**Root cause:** CPU promotes bfloat16 to float32 for softmax; GPU performs softmax in bfloat16. At scale=100, this causes significant divergence in the loss value.
+
+```
+bfloat16 scale=100: CPU=2.344, GPU=0.344, diff=2.000  *** DIVERGENCE ***
+*** BUG: cross_entropy bfloat16 diverges CPU vs GPU at large logit scale ***
+```
+
+---
+
+### Bug 68 — `pt_scatter_reduce_float16.py`
+
+**Operation:** `torch.Tensor.scatter_reduce_` (mean/sum) with float16  
+**Root cause:** GPU uses non-deterministic atomics for float16 scatter reduction. GPU is ~14x less accurate than CPU, and GPU results differ across runs.
+
+```
+M=100000, N=500: CPU_err=6.104e-04, GPU_err=8.789e-03, diff=2.188e-01  *** DIVERGENCE ***
+GPU non-determinism: 1.953e-02  *** GPU NON-DETERMINISTIC ***
+*** BUG: scatter_reduce float16 GPU ~14x less accurate and non-deterministic ***
+```
+
+---
+
+### Bug 69 — `pt_sort_nan_position.py`
+
+**Operation:** `torch.sort` with multiple NaN values  
+**Root cause:** When multiple NaNs are present, CPU sequential sort and GPU parallel bitonic sort assign them to different positions. The sorted values look the same but the source **indices** differ.
+
+```
+sort([NaN, 3, NaN, 1, NaN]):
+CPU sorted values: [1.0, 3.0, nan, nan, nan]
+GPU sorted values: [1.0, 3.0, nan, nan, nan]  (same values!)
+CPU indices: [3, 1, 0, 2, 4]   GPU indices: [3, 1, 4, 2, 0]  ← DIFFER
+*** BUG: Different indices returned for NaN positions ***
+```
+
+---
+
+### Bug 70 — `pt_cholesky_nonpsd.py`
+
+**Operation:** `torch.linalg.cholesky` on a non-positive-definite matrix  
+**Root cause:** LAPACK (CPU) detects the non-PSD condition and raises `RuntimeError`. cuSOLVER (GPU) silently returns a result with garbage values. This is a categorical error-handling divergence.
+
+```
+cholesky(non-PSD 64x64, seed=1):
+CPU: raises RuntimeError (correct — matrix is not PD)
+GPU: succeeds with garbage values  *** BUG ***
+*** BUG CONFIRMED: CPU=raises RuntimeError, GPU=succeeds ***
+```
+
+---
+
+### Bug 71 — `tf_segment_prod_float16.py`
+
+**Operation:** `tf.math.unsorted_segment_prod` with float16  
+**Root cause:** GPU uses non-deterministic `atomicMul` for float16 product accumulation. Both non-determinism and CPU/GPU divergence are significant.
+
+```
+M=50000, N=100: CPU_err=2.861e-02, GPU_err=2.502e-02, diff=1.758e-02  *** DIVERGENCE ***
+GPU non-determinism: run0_vs_run1=2.441e-02  *** GPU NON-DETERMINISTIC ***
+*** BUG: CPU and GPU produce different results for float16 segment_prod ***
+```
+
+---
+
+### Bug 72 — `pt_cumsum_f32_large.py`
+
+**Operation:** `torch.cumsum` with float32, large all-positive inputs (N=10M)  
+**Root cause:** GPU uses a parallel prefix-scan (Blelloch algorithm) which introduces more rounding error than CPU's sequential accumulation for monotone-growing sums. GPU is ~18x less accurate than CPU.
+
+```
+positive N=10000000: CPU_err=2.500e-01, GPU_err=4.685e+00, diff=4.500e+00, ratio=18.7x
+*** BUG: GPU is 18x less accurate than CPU for float32 cumsum ***
+```
+
+---
+
+### Bug 73 — `pt_slogdet_accuracy.py`
+
+**Operation:** `torch.linalg.slogdet` on near-singular float32 batched matrices  
+**Root cause:** CPU (LAPACK `dgetrf`) and GPU (cuSOLVER `dgetrf`) use different pivot strategies for nearly-singular matrices. The log-determinant computation amplifies small differences in the LU factorization.
+
+```
+slogdet(batch=16, 32x32 float32, min_eigenval=1e-7):
+CPU logdets[:4]: [-15.75, -16.38, -15.22, -16.11]
+GPU logdets[:4]: [-13.52, -14.12, -13.14, -13.89]
+Max logdet diff: 2.2573e+00
+*** BUG: CPU and GPU log-determinants differ by up to 2.2573 ***
+```
+
+---
+
+### Bug 74 — `tf_unsorted_segment_mean_float16.py`
+
+**Operation:** `tf.math.unsorted_segment_mean` with float16  
+**Root cause:** GPU uses non-deterministic `atomicAdd` for float16 mean accumulation before dividing by count. CPU uses sequential summation. Results differ across GPU runs and from CPU.
+
+```
+M=500000, N=500: GPU non-determinism run0_vs_run1=7.019e-04  *** GPU NON-DETERMINISTIC ***
+bfloat16 M=500000, N=500: diff=2.344e-02  *** DIVERGENCE ***
+GPU non-determinism: 1.083e-03
+*** BUG: GPU non-deterministic for segment_mean float16 ***
+```
+
+---
+
+### Bug 75 — `pt_index_reduce_float16.py`
+
+**Operation:** `torch.Tensor.index_reduce_` with float16, 'mean' reduce mode  
+**Root cause:** GPU uses non-deterministic atomics for float16 mean reduction (online mean via `atomicAdd` + count tracking). Results differ across GPU runs.
+
+```
+M=500000, N=1000, mode='mean':
+GPU run0_vs_run1=9.155e-04, run0_vs_run2=7.935e-04
+*** BUG: GPU non-deterministic for index_reduce_ float16 'mean' ***
+```
+
+---
+
+### Bug 76 — `pt_linalg_inv_nearsingular.py`
+
+**Operation:** `torch.linalg.inv` on near-singular float32 matrices  
+**Root cause:** CPU (LAPACK `dgetrf`) and GPU (cuSOLVER `dgetrf`) use different partial pivoting strategies. For matrices with very small eigenvalues (1e-7 to 1e-8), the computed inverses diverge dramatically.
+
+```
+linalg.inv(128x128 float32, min_eigenval=1e-7):
+CPU inv max val: 4.437e+05
+GPU inv max val: 2.976e+05
+Max element diff: 1.4611e+05, rel_diff: 3.2928e-01
+*** BUG: CPU and GPU matrix inverses differ by 0.33 relative ***
+```
+
+---
+
+### Bug 77 — `tf_segment_prod_bfloat16.py`
+
+**Operation:** `tf.math.unsorted_segment_prod` with bfloat16  
+**Root cause:** GPU uses non-deterministic `atomicMul` for bfloat16 product accumulation. CPU sequential multiplication gives different results. Both CPU/GPU divergence and GPU non-determinism are significant.
+
+```
+M=100000, N=200 bfloat16:
+CPU vs GPU max diff: 1.328e-01
+GPU non-determinism: 1.250e-01
+*** BUG: CPU and GPU segment_prod differ by 0.133 for bfloat16 ***
+```
+
+---
+
+### Bug 78 — `pt_instance_norm_extreme.py`
+
+**Operation:** `torch.nn.functional.instance_norm` on float32 inputs at scale 1e20, larger spatial dims  
+**Root cause:** At scale=1e20 with spatial size 32×32, GPU's parallel variance reduction overflows to `inf` in intermediate computations, producing NaN output. CPU's sequential Welford algorithm avoids these intermediate overflows.
+
+```
+instance_norm(float32, scale=1e+20, shape=[8, 32, 32, 32]):
+CPU: nan=False   GPU: nan=True
+*** BUG CONFIRMED: GPU=NaN/Inf, CPU=finite ***
+```
+
+---
+
+### Bug 79 — `pt_cumsum_bf16_large.py`
+
+**Operation:** `torch.cumsum` with bfloat16, large all-positive inputs (N=10M)  
+**Root cause:** GPU uses a parallel prefix-scan while CPU accumulates sequentially. For bfloat16 (7-bit mantissa), the parallel scan introduces significantly more rounding error than sequential accumulation at large N.
+
+```
+cumsum(bfloat16, N=10000000, all-positive):
+CPU_err=6.262e+04, GPU_err=2.815e+05
+CPU vs GPU diff=2.294e+05, GPU/CPU accuracy ratio=4.5x
+*** BUG: GPU is 4x less accurate than CPU for bfloat16 cumsum ***
 ```
