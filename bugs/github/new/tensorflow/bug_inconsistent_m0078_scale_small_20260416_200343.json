@@ -1,0 +1,41 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 78,
+  "mutation": "scale_small",
+  "detail": "rel_err=6.903e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=16",
+  "apis_selected": [
+    "tf.keras.optimizers.Adamax",
+    "tf.keras.experimental.CosineDecayRestarts",
+    "tf.keras.losses.mean_absolute_percentage_error",
+    "tf.keras.layers.experimental.preprocessing.RandomFlip",
+    "tf.metrics.SensitivityAtSpecificity",
+    "tf.initializers.GlorotNormal",
+    "tf.keras.layers.Discretization",
+    "tf.initializers.lecun_uniform",
+    "tf.metrics.CosineSimilarity",
+    "tf.keras.layers.GlobalAvgPool1D",
+    "tf.keras.metrics.kld",
+    "tf.greater_equal",
+    "tf.unique_with_counts",
+    "tf.TensorSpec",
+    "tf.round",
+    "tf.signal.vorbis_window",
+    "tf.reduce_prod",
+    "tf.linalg.LinearOperatorAdjoint",
+    "tf.math.reciprocal",
+    "tf.signal.hann_window"
+  ],
+  "used_apis": [
+    "tf.keras.layers.Dense",
+    "tf.initializers.GlorotNormal",
+    "tf.keras.layers.BatchNormalization",
+    "tf.keras.layers.LayerNormalization",
+    "tf.keras.layers.Activation",
+    "tf.keras.layers.GlobalAvgPool1D",
+    "tf.metrics.CosineSimilarity",
+    "tf.GradientTape",
+    "tf.reduce_prod"
+  ],
+  "timestamp": "20260416_200343",
+  "model_file": "/home/binduan/myspace/smolfuzz/results/clean_run_tf/models/model_0078.py"
+}

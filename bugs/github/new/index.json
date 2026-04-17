@@ -1,0 +1,718 @@
+{
+  "real_bugs": [
+    {
+      "framework": "pytorch",
+      "base": "bug_inconsistent_m0028_mut5_20260416_183107",
+      "bug_type": "inconsistent",
+      "model_id": 28,
+      "mutation": "scale_large",
+      "detail": "output[0]: rel_err=8.380e+02 > 1.0 dtype=torch.float32 shape=[4, 4] rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00",
+      "used_apis": [
+        "torch.nn.Linear",
+        "torch.nn.functional.elu",
+        "torch.nn.BatchNorm1d",
+        "torch.sin",
+        "torch.clip",
+        "torch.cummax",
+        "torch.Tensor.max",
+        "torch.row_stack"
+      ],
+      "triage_reason": "rel_err=838.0 > 100.0\u00d7 (nondet=0.0, mut=scale_large)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0028_mut5_20260416_183107.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0028_mut5_20260416_183107.inputs.pt",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0028_mut5_20260416_183107.cpu_out.pt",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0028_mut5_20260416_183107.gpu_out.pt",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0028_mut5_20260416_183107.repro.py",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/model_0028.py"
+      ]
+    },
+    {
+      "framework": "pytorch",
+      "base": "bug_inconsistent_m0035_mut1_20260416_183902",
+      "bug_type": "inconsistent",
+      "model_id": 35,
+      "mutation": "add_noise",
+      "detail": "output[0]: rel_err=3.710e+03 > 1.0 dtype=torch.float32 shape=[4, 1] rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00",
+      "used_apis": [
+        "torch.nn.init.kaiming_normal_",
+        "torch.nn.functional.glu",
+        "torch.unique_consecutive",
+        "torch.Tensor.tensor_split",
+        "float_power_",
+        "torch.erf",
+        "torch.Tensor.sort",
+        "torch.abs",
+        "torch.log1p",
+        "torch.asinh",
+        "torch.expm1",
+        "torch.amin",
+        "torch.negative",
+        "torch.enable_grad"
+      ],
+      "triage_reason": "rel_err=3710.0 > 100.0\u00d7 (nondet=0.0, mut=add_noise)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0035_mut1_20260416_183902.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0035_mut1_20260416_183902.inputs.pt",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0035_mut1_20260416_183902.cpu_out.pt",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0035_mut1_20260416_183902.gpu_out.pt",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0035_mut1_20260416_183902.repro.py",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/model_0035.py"
+      ]
+    },
+    {
+      "framework": "pytorch",
+      "base": "bug_inconsistent_m0046_mut5_20260416_185555",
+      "bug_type": "inconsistent",
+      "model_id": 46,
+      "mutation": "scale_large",
+      "detail": "output[0]: rel_err=1.631e+02 > 1.0 dtype=torch.float32 shape=[4, 4] rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00",
+      "used_apis": [
+        "torch.nn.Linear",
+        "torch.nn.BatchNorm1d",
+        "torch.nn.Mish",
+        "torch.nn.functional.hardswish",
+        "torch.nn.functional.threshold_",
+        "torch.fmod",
+        "torch.exp",
+        "torch.sin",
+        "torch.enable_grad"
+      ],
+      "triage_reason": "rel_err=163.1 > 100.0\u00d7 (nondet=0.0, mut=scale_large)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0046_mut5_20260416_185555.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0046_mut5_20260416_185555.inputs.pt",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0046_mut5_20260416_185555.cpu_out.pt",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0046_mut5_20260416_185555.gpu_out.pt",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0046_mut5_20260416_185555.repro.py",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/model_0046.py"
+      ]
+    },
+    {
+      "framework": "pytorch",
+      "base": "bug_inconsistent_m0050_mut5_20260416_190108",
+      "bug_type": "inconsistent",
+      "model_id": 50,
+      "mutation": "scale_large",
+      "detail": "output[0]: rel_err=2.587e+02 > 1.0 dtype=torch.float32 shape=[64] rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00",
+      "used_apis": [
+        "torch.nn.Linear",
+        "torch.nn.functional.silu",
+        "torch.nn.BatchNorm1d",
+        "torch.sin",
+        "torch.arctanh",
+        "torch.sigmoid",
+        "torch.autograd.grad",
+        "torch.concat",
+        "torch.flatten",
+        "torch.enable_grad"
+      ],
+      "triage_reason": "rel_err=258.7 > 100.0\u00d7 (nondet=0.0, mut=scale_large)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0050_mut5_20260416_190108.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0050_mut5_20260416_190108.inputs.pt",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0050_mut5_20260416_190108.cpu_out.pt",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0050_mut5_20260416_190108.gpu_out.pt",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0050_mut5_20260416_190108.repro.py",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/model_0050.py"
+      ]
+    },
+    {
+      "framework": "pytorch",
+      "base": "bug_inconsistent_m0088_mut3_20260416_200741",
+      "bug_type": "inconsistent",
+      "model_id": 88,
+      "mutation": "mask",
+      "detail": "output[0]: rel_err=4.459e+03 > 1.0 dtype=torch.float32 shape=[4, 8] rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00",
+      "used_apis": [
+        "torch.nn.Linear",
+        "torch.nn.BatchNorm1d",
+        "torch.nn.ELU",
+        "torch.addcdiv",
+        "torch.linalg.matrix_norm",
+        "torch.full_like",
+        "torch.Tensor.unsqueeze_",
+        "torch.fmod",
+        "torch.arcsinh",
+        "torch.svd_lowrank",
+        "torch.fft.irfftn",
+        "torch.enable_grad"
+      ],
+      "triage_reason": "rel_err=4459.0 > 100.0\u00d7 (nondet=0.0, mut=mask)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0088_mut3_20260416_200741.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0088_mut3_20260416_200741.inputs.pt",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0088_mut3_20260416_200741.cpu_out.pt",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0088_mut3_20260416_200741.gpu_out.pt",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/bug_inconsistent_m0088_mut3_20260416_200741.repro.py",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/pytorch/model_0088.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0004_scale_small_20260416_174618",
+      "bug_type": "inconsistent",
+      "model_id": 4,
+      "mutation": "scale_small",
+      "detail": "rel_err=1.811e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=16",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.regularizers.L2",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.nn.gelu",
+        "tf.keras.layers.EinsumDense",
+        "tf.GradientTape",
+        "tf.device"
+      ],
+      "triage_reason": "rel_err=181.1 > 100.0\u00d7 (nondet=0.0, mut=scale_small)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0004_scale_small_20260416_174618.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0004_scale_small_20260416_174618.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0004.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0008_scale_small_20260416_175223",
+      "bug_type": "inconsistent",
+      "model_id": 8,
+      "mutation": "scale_small",
+      "detail": "rel_err=1.028e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.keras.activations.swish",
+        "tf.keras.layers.Average",
+        "tf.GradientTape",
+        "tf.device",
+        "tf.keras.metrics.FalseNegatives",
+        "tf.keras.losses.LogCosh",
+        "tf.keras.losses.MeanAbsoluteError"
+      ],
+      "triage_reason": "rel_err=102.8 > 100.0\u00d7 (nondet=0.0, mut=scale_small)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0008_scale_small_20260416_175223.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0008_scale_small_20260416_175223.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0008.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0029_scale_small_20260416_183049",
+      "bug_type": "inconsistent",
+      "model_id": 29,
+      "mutation": "scale_small",
+      "detail": "rel_err=1.149e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.initializers.GlorotUniform",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.keras.layers.Activation",
+        "tf.cos",
+        "tf.math.cosh",
+        "tf.GradientTape",
+        "tf.device",
+        "tf.optimizers.Adadelta"
+      ],
+      "triage_reason": "rel_err=114.9 > 100.0\u00d7 (nondet=0.0, mut=scale_small)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0029_scale_small_20260416_183049.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0029_scale_small_20260416_183049.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0029.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0036_scale_large_20260416_184504",
+      "bug_type": "inconsistent",
+      "model_id": 36,
+      "mutation": "scale_large",
+      "detail": "rel_err=2.360e+05 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.initializers.RandomUniform",
+        "tf.keras.layers.Hashing",
+        "tf.keras.constraints.unit_norm",
+        "tf.nn.swish",
+        "tf.GradientTape",
+        "tf.metrics.Sum",
+        "tf.maximum",
+        "tf.device",
+        "tf.zeros_like"
+      ],
+      "triage_reason": "rel_err=236000.0 > 100.0\u00d7 (nondet=0.0, mut=scale_large)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0036_scale_large_20260416_184504.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0036_scale_large_20260416_184504.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0036.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0045_scale_small_20260416_190139",
+      "bug_type": "inconsistent",
+      "model_id": 45,
+      "mutation": "scale_small",
+      "detail": "rel_err=1.603e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.initializers.HeNormal",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.keras.layers.Activation",
+        "tf.keras.constraints.min_max_norm",
+        "tf.GradientTape"
+      ],
+      "triage_reason": "rel_err=160.3 > 100.0\u00d7 (nondet=0.0, mut=scale_small)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0045_scale_small_20260416_190139.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0045_scale_small_20260416_190139.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0045.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0068_add_noise_20260416_194417",
+      "bug_type": "inconsistent",
+      "model_id": 68,
+      "mutation": "add_noise",
+      "detail": "rel_err=2.106e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.layers.PReLU",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.losses.MeanAbsoluteError",
+        "tf.GradientTape",
+        "tf.zeros_like",
+        "tf.clip_by_value",
+        "tf.device"
+      ],
+      "triage_reason": "rel_err=210.6 > 100.0\u00d7 (nondet=0.0, mut=add_noise)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0068_add_noise_20260416_194417.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0068_add_noise_20260416_194417.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0068.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0078_scale_small_20260416_200343",
+      "bug_type": "inconsistent",
+      "model_id": 78,
+      "mutation": "scale_small",
+      "detail": "rel_err=6.903e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=16",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.initializers.GlorotNormal",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.keras.layers.Activation",
+        "tf.keras.layers.GlobalAvgPool1D",
+        "tf.metrics.CosineSimilarity",
+        "tf.GradientTape",
+        "tf.reduce_prod"
+      ],
+      "triage_reason": "rel_err=690.3 > 100.0\u00d7 (nondet=0.0, mut=scale_small)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0078_scale_small_20260416_200343.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0078_scale_small_20260416_200343.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0078.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0079_scale_small_20260416_200526",
+      "bug_type": "inconsistent",
+      "model_id": 79,
+      "mutation": "scale_small",
+      "detail": "rel_err=1.087e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.activations.get",
+        "tf.keras.layers.LayerNormalization"
+      ],
+      "triage_reason": "rel_err=108.7 > 100.0\u00d7 (nondet=0.0, mut=scale_small)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0079_scale_small_20260416_200526.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0079_scale_small_20260416_200526.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0079.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0080_scale_small_20260416_200659",
+      "bug_type": "inconsistent",
+      "model_id": 80,
+      "mutation": "scale_small",
+      "detail": "rel_err=1.153e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=16",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.keras.activations.selu",
+        "tf.GradientTape",
+        "tf.device"
+      ],
+      "triage_reason": "rel_err=115.3 > 100.0\u00d7 (nondet=0.0, mut=scale_small)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0080_scale_small_20260416_200659.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0080_scale_small_20260416_200659.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0080.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0082_scale_small_20260416_201012",
+      "bug_type": "inconsistent",
+      "model_id": 82,
+      "mutation": "scale_small",
+      "detail": "rel_err=1.698e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.initializers.lecun_normal",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.keras.layers.Activation",
+        "tf.sinh",
+        "tf.GradientTape",
+        "tf.device"
+      ],
+      "triage_reason": "rel_err=169.8 > 100.0\u00d7 (nondet=0.0, mut=scale_small)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0082_scale_small_20260416_201012.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0082_scale_small_20260416_201012.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0082.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0090_scale_large_20260416_202258",
+      "bug_type": "inconsistent",
+      "model_id": 90,
+      "mutation": "scale_large",
+      "detail": "rel_err=1.096e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.keras.activations.exponential",
+        "tf.keras.layers.StringLookup",
+        "tf.GradientTape",
+        "tf.slice"
+      ],
+      "triage_reason": "rel_err=109.6 > 100.0\u00d7 (nondet=0.0, mut=scale_large)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0090_scale_large_20260416_202258.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0090_scale_large_20260416_202258.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0090.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0092_scale_small_20260416_202454",
+      "bug_type": "inconsistent",
+      "model_id": 92,
+      "mutation": "scale_small",
+      "detail": "rel_err=2.631e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=16",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.initializers.Orthogonal",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.keras.activations.swish",
+        "tf.GradientTape",
+        "tf.device",
+        "tf.keras.layers.GlobalMaxPooling1D"
+      ],
+      "triage_reason": "rel_err=263.1 > 100.0\u00d7 (nondet=0.0, mut=scale_small)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0092_scale_small_20260416_202454.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0092_scale_small_20260416_202454.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0092.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0100_mask_20260416_203852",
+      "bug_type": "inconsistent",
+      "model_id": 100,
+      "mutation": "mask",
+      "detail": "rel_err=1.989e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=4",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.keras.activations.gelu",
+        "tf.GradientTape",
+        "tf.device"
+      ],
+      "triage_reason": "rel_err=198.9 > 100.0\u00d7 (nondet=0.0, mut=mask)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0100_mask_20260416_203852.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0100_mask_20260416_203852.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0100.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0102_add_noise_20260416_204116",
+      "bug_type": "inconsistent",
+      "model_id": 102,
+      "mutation": "add_noise",
+      "detail": "rel_err=1.094e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.initializers.HeNormal",
+        "tf.tanh",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.GradientTape"
+      ],
+      "triage_reason": "rel_err=109.4 > 100.0\u00d7 (nondet=0.0, mut=add_noise)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0102_add_noise_20260416_204116.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0102_add_noise_20260416_204116.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0102.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0108_scale_small_20260416_204927",
+      "bug_type": "inconsistent",
+      "model_id": 108,
+      "mutation": "scale_small",
+      "detail": "rel_err=1.063e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.nn.gelu",
+        "tf.GradientTape",
+        "tf.device",
+        "tf.math.maximum"
+      ],
+      "triage_reason": "rel_err=106.3 > 100.0\u00d7 (nondet=0.0, mut=scale_small)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0108_scale_small_20260416_204927.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0108_scale_small_20260416_204927.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0108.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0117_add_noise_20260416_210321",
+      "bug_type": "inconsistent",
+      "model_id": 117,
+      "mutation": "add_noise",
+      "detail": "rel_err=1.411e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.keras.activations.swish",
+        "tf.metrics.MeanMetricWrapper",
+        "tf.keras.losses.logcosh",
+        "tf.metrics.MeanAbsoluteError",
+        "tf.GradientTape",
+        "tf.device"
+      ],
+      "triage_reason": "rel_err=141.1 > 100.0\u00d7 (nondet=0.0, mut=add_noise)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0117_add_noise_20260416_210321.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0117_add_noise_20260416_210321.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0117.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0126_uniform_20260416_211538",
+      "bug_type": "inconsistent",
+      "model_id": 126,
+      "mutation": "uniform",
+      "detail": "rel_err=3.636e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.GradientTape",
+        "tf.keras.layers.Maximum",
+        "tf.math.reduce_sum",
+        "tf.keras.metrics.Mean",
+        "tf.keras.metrics.SparseCategoricalAccuracy",
+        "tf.device"
+      ],
+      "triage_reason": "rel_err=363.6 > 100.0\u00d7 (nondet=0.0, mut=uniform)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0126_uniform_20260416_211538.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0126_uniform_20260416_211538.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0126.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0147_scale_small_20260416_214039",
+      "bug_type": "inconsistent",
+      "model_id": 147,
+      "mutation": "scale_small",
+      "detail": "rel_err=3.597e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.layers.LeakyReLU",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.keras.constraints.NonNeg",
+        "tf.keras.optimizers.Adagrad",
+        "tf.GradientTape",
+        "tf.device"
+      ],
+      "triage_reason": "rel_err=359.7 > 100.0\u00d7 (nondet=0.0, mut=scale_small)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0147_scale_small_20260416_214039.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0147_scale_small_20260416_214039.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0147.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0149_scale_small_20260416_214243",
+      "bug_type": "inconsistent",
+      "model_id": 149,
+      "mutation": "scale_small",
+      "detail": "rel_err=1.156e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.initializers.RandomNormal",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.keras.layers.Concatenate",
+        "tf.keras.layers.Activation",
+        "tf.keras.optimizers.Nadam",
+        "tf.metrics.RootMeanSquaredError",
+        "tf.GradientTape",
+        "tf.device"
+      ],
+      "triage_reason": "rel_err=115.6 > 100.0\u00d7 (nondet=0.0, mut=scale_small)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0149_scale_small_20260416_214243.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0149_scale_small_20260416_214243.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0149.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0154_scale_small_20260416_214902",
+      "bug_type": "inconsistent",
+      "model_id": 154,
+      "mutation": "scale_small",
+      "detail": "rel_err=1.000e+04 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=int32 n=8",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.initializers.TruncatedNormal",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.keras.layers.Activation",
+        "tf.losses.SparseCategoricalCrossentropy",
+        "tf.keras.metrics.MeanAbsolutePercentageError",
+        "tf.GradientTape",
+        "tf.sinh",
+        "tf.math.digamma",
+        "tf.math.erfinv",
+        "tf.transpose",
+        "tf.ones_like",
+        "tf.bitwise.bitwise_xor",
+        "tf.math.reduce_sum",
+        "tf.device"
+      ],
+      "triage_reason": "rel_err=10000.0 > 100.0\u00d7 (nondet=0.0, mut=scale_small)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0154_scale_small_20260416_214902.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0154_scale_small_20260416_214902.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0154.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0157_scale_small_20260416_215058",
+      "bug_type": "inconsistent",
+      "model_id": 157,
+      "mutation": "scale_small",
+      "detail": "rel_err=1.225e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.GradientTape",
+        "tf.keras.layers.Convolution1DTranspose",
+        "tf.math.cos",
+        "tf.device"
+      ],
+      "triage_reason": "rel_err=122.5 > 100.0\u00d7 (nondet=0.0, mut=scale_small)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0157_scale_small_20260416_215058.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0157_scale_small_20260416_215058.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0157.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0163_scale_small_20260416_215721",
+      "bug_type": "inconsistent",
+      "model_id": 163,
+      "mutation": "scale_small",
+      "detail": "rel_err=1.276e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.keras.regularizers.L1L2",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.keras.layers.Activation",
+        "tf.math.multiply",
+        "tf.GradientTape",
+        "tf.device"
+      ],
+      "triage_reason": "rel_err=127.6 > 100.0\u00d7 (nondet=0.0, mut=scale_small)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0163_scale_small_20260416_215721.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0163_scale_small_20260416_215721.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0163.py"
+      ]
+    },
+    {
+      "framework": "tensorflow",
+      "base": "bug_inconsistent_m0164_scale_small_20260416_215811",
+      "bug_type": "inconsistent",
+      "model_id": 164,
+      "mutation": "scale_small",
+      "detail": "rel_err=6.386e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+      "used_apis": [
+        "tf.keras.layers.Dense",
+        "tf.initializers.Identity",
+        "tf.keras.layers.BatchNormalization",
+        "tf.keras.layers.LayerNormalization",
+        "tf.keras.activations.exponential",
+        "tf.GradientTape",
+        "tf.math.squared_difference",
+        "tf.nn.tanh",
+        "tf.math.sqrt",
+        "tf.device"
+      ],
+      "triage_reason": "rel_err=638.6 > 100.0\u00d7 (nondet=0.0, mut=scale_small)",
+      "artifacts": [
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0164_scale_small_20260416_215811.json",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/bug_inconsistent_m0164_scale_small_20260416_215811.inputs.npy",
+        "/home/binduan/myspace/smolfuzz/bugs/github/new/tensorflow/model_0164.py"
+      ]
+    }
+  ],
+  "rejected": [],
+  "stats": {
+    "pt_started": 102,
+    "pt_clean": 32,
+    "tf_started": 200,
+    "tf_clean": 105
+  }
+}

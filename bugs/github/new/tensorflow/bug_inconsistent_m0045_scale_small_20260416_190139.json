@@ -1,0 +1,39 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 45,
+  "mutation": "scale_small",
+  "detail": "rel_err=1.603e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+  "apis_selected": [
+    "tf.optimizers.Adam",
+    "tf.keras.constraints.min_max_norm",
+    "tf.keras.metrics.mape",
+    "tf.losses.kl_divergence",
+    "tf.keras.losses.mean_squared_logarithmic_error",
+    "tf.keras.layers.RandomRotation",
+    "tf.metrics.get",
+    "tf.keras.initializers.HeNormal",
+    "tf.keras.initializers.LecunNormal",
+    "tf.keras.metrics.mean_absolute_percentage_error",
+    "tf.losses.kld",
+    "tf.reverse_sequence",
+    "tf.ones_like",
+    "tf.math.greater",
+    "tf.linalg.LinearOperatorAdjoint",
+    "tf.math.unsorted_segment_mean",
+    "tf.signal.mfccs_from_log_mel_spectrograms",
+    "tf.math.greater_equal",
+    "tf.signal.inverse_stft_window_fn",
+    "tf.OptionalSpec"
+  ],
+  "used_apis": [
+    "tf.keras.layers.Dense",
+    "tf.keras.initializers.HeNormal",
+    "tf.keras.layers.BatchNormalization",
+    "tf.keras.layers.LayerNormalization",
+    "tf.keras.layers.Activation",
+    "tf.keras.constraints.min_max_norm",
+    "tf.GradientTape"
+  ],
+  "timestamp": "20260416_190139",
+  "model_file": "/home/binduan/myspace/smolfuzz/results/clean_run_tf/models/model_0045.py"
+}

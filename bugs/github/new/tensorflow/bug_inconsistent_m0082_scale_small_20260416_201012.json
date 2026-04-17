@@ -1,0 +1,40 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 82,
+  "mutation": "scale_small",
+  "detail": "rel_err=1.698e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+  "apis_selected": [
+    "tf.optimizers.Optimizer",
+    "tf.keras.experimental.CosineDecayRestarts",
+    "tf.keras.metrics.sparse_top_k_categorical_accuracy",
+    "tf.keras.initializers.lecun_normal",
+    "tf.keras.losses.MAPE",
+    "tf.keras.layers.MaxPooling3D",
+    "tf.metrics.SparseCategoricalAccuracy",
+    "tf.keras.layers.Layer",
+    "tf.metrics.MeanSquaredLogarithmicError",
+    "tf.metrics.Hinge",
+    "tf.keras.layers.experimental.SyncBatchNormalization",
+    "tf.keras.layers.experimental.preprocessing.RandomZoom",
+    "tf.split",
+    "tf.constant",
+    "tf.sinh",
+    "tf.math.polygamma",
+    "tf.signal.inverse_mdct",
+    "tf.meshgrid",
+    "tf.signal.frame",
+    "tf.math.reduce_variance"
+  ],
+  "used_apis": [
+    "tf.keras.layers.Dense",
+    "tf.keras.initializers.lecun_normal",
+    "tf.keras.layers.BatchNormalization",
+    "tf.keras.layers.LayerNormalization",
+    "tf.keras.layers.Activation",
+    "tf.sinh",
+    "tf.GradientTape",
+    "tf.device"
+  ],
+  "timestamp": "20260416_201012",
+  "model_file": "/home/binduan/myspace/smolfuzz/results/clean_run_tf/models/model_0082.py"
+}

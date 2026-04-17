@@ -1,0 +1,42 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 8,
+  "mutation": "scale_small",
+  "detail": "rel_err=1.028e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+  "apis_selected": [
+    "tf.optimizers.Adam",
+    "tf.keras.losses.logcosh",
+    "tf.keras.metrics.get",
+    "tf.keras.metrics.FalseNegatives",
+    "tf.keras.layers.experimental.preprocessing.RandomFlip",
+    "tf.keras.activations.softsign",
+    "tf.keras.layers.Average",
+    "tf.initializers.deserialize",
+    "tf.keras.activations.swish",
+    "tf.keras.losses.mean_absolute_error",
+    "tf.keras.layers.MaxPooling1D",
+    "tf.shape",
+    "tf.TensorSpec",
+    "tf.reduce_sum",
+    "tf.linalg.global_norm",
+    "tf.asin",
+    "tf.round",
+    "tf.math.add",
+    "tf.math.special.bessel_i1",
+    "tf.TensorShape"
+  ],
+  "used_apis": [
+    "tf.keras.layers.Dense",
+    "tf.keras.layers.BatchNormalization",
+    "tf.keras.layers.LayerNormalization",
+    "tf.keras.activations.swish",
+    "tf.keras.layers.Average",
+    "tf.GradientTape",
+    "tf.device",
+    "tf.keras.metrics.FalseNegatives",
+    "tf.keras.losses.LogCosh",
+    "tf.keras.losses.MeanAbsoluteError"
+  ],
+  "timestamp": "20260416_175223",
+  "model_file": "/home/binduan/myspace/smolfuzz/results/clean_run_tf/models/model_0008.py"
+}

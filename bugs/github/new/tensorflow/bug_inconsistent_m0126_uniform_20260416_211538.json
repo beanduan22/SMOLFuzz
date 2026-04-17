@@ -1,0 +1,41 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 126,
+  "mutation": "uniform",
+  "detail": "rel_err=3.636e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+  "apis_selected": [
+    "tf.keras.optimizers.schedules.InverseTimeDecay",
+    "tf.keras.metrics.squared_hinge",
+    "tf.keras.layers.Maximum",
+    "tf.keras.layers.RandomCrop",
+    "tf.keras.metrics.poisson",
+    "tf.keras.metrics.SparseCategoricalAccuracy",
+    "tf.keras.metrics.AUC",
+    "tf.keras.metrics.Mean",
+    "tf.keras.losses.mape",
+    "tf.keras.losses.MeanAbsolutePercentageError",
+    "tf.equal",
+    "tf.broadcast_dynamic_shape",
+    "tf.numpy_function",
+    "tf.math.reduce_sum",
+    "tf.linalg.LinearOperatorTridiag",
+    "tf.linalg.eigh",
+    "tf.math.special.dawsn",
+    "tf.linalg.normalize",
+    "tf.linalg.logdet",
+    "tf.linalg.tridiagonal_solve"
+  ],
+  "used_apis": [
+    "tf.keras.layers.Dense",
+    "tf.keras.layers.BatchNormalization",
+    "tf.keras.layers.LayerNormalization",
+    "tf.GradientTape",
+    "tf.keras.layers.Maximum",
+    "tf.math.reduce_sum",
+    "tf.keras.metrics.Mean",
+    "tf.keras.metrics.SparseCategoricalAccuracy",
+    "tf.device"
+  ],
+  "timestamp": "20260416_211538",
+  "model_file": "/home/binduan/myspace/smolfuzz/results/clean_run_tf/models/model_0126.py"
+}

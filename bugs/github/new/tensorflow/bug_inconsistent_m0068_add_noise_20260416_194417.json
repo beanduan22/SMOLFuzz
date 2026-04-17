@@ -1,0 +1,40 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 68,
+  "mutation": "add_noise",
+  "detail": "rel_err=2.106e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+  "apis_selected": [
+    "tf.optimizers.schedules.deserialize",
+    "tf.initializers.Initializer",
+    "tf.losses.mean_absolute_percentage_error",
+    "tf.keras.layers.CenterCrop",
+    "tf.keras.losses.MSE",
+    "tf.losses.msle",
+    "tf.keras.activations.hard_sigmoid",
+    "tf.keras.layers.PReLU",
+    "tf.keras.regularizers.L2",
+    "tf.losses.mape",
+    "tf.math.is_inf",
+    "tf.concat",
+    "tf.zeros_like",
+    "tf.clip_by_value",
+    "tf.histogram_fixed_width_bins",
+    "tf.math.special.dawsn",
+    "tf.signal.irfft",
+    "tf.math.abs",
+    "tf.signal.inverse_mdct",
+    "tf.group"
+  ],
+  "used_apis": [
+    "tf.keras.layers.Dense",
+    "tf.keras.layers.PReLU",
+    "tf.keras.layers.BatchNormalization",
+    "tf.keras.losses.MeanAbsoluteError",
+    "tf.GradientTape",
+    "tf.zeros_like",
+    "tf.clip_by_value",
+    "tf.device"
+  ],
+  "timestamp": "20260416_194417",
+  "model_file": "/home/binduan/myspace/smolfuzz/results/clean_run_tf/models/model_0068.py"
+}

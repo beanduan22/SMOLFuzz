@@ -1,0 +1,39 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 90,
+  "mutation": "scale_large",
+  "detail": "rel_err=1.096e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+  "apis_selected": [
+    "tf.keras.optimizers.Adam",
+    "tf.keras.layers.Wrapper",
+    "tf.losses.categorical_crossentropy",
+    "tf.metrics.BinaryCrossentropy",
+    "tf.keras.activations.exponential",
+    "tf.keras.layers.experimental.preprocessing.StringLookup",
+    "tf.keras.metrics.mean_squared_logarithmic_error",
+    "tf.keras.backend.reset_uids",
+    "tf.keras.metrics.FalseNegatives",
+    "tf.keras.layers.experimental.SyncBatchNormalization",
+    "tf.nn.dropout",
+    "tf.math.is_finite",
+    "tf.slice",
+    "tf.TensorSpec",
+    "tf.signal.mdct",
+    "tf.math.floormod",
+    "tf.math.special.bessel_k0e",
+    "tf.signal.irfft2d",
+    "tf.math.expm1",
+    "tf.math.reduce_prod"
+  ],
+  "used_apis": [
+    "tf.keras.layers.Dense",
+    "tf.keras.layers.BatchNormalization",
+    "tf.keras.layers.LayerNormalization",
+    "tf.keras.activations.exponential",
+    "tf.keras.layers.StringLookup",
+    "tf.GradientTape",
+    "tf.slice"
+  ],
+  "timestamp": "20260416_202258",
+  "model_file": "/home/binduan/myspace/smolfuzz/results/clean_run_tf/models/model_0090.py"
+}

@@ -1,0 +1,42 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 29,
+  "mutation": "scale_small",
+  "detail": "rel_err=1.149e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+  "apis_selected": [
+    "tf.optimizers.Adadelta",
+    "tf.keras.initializers.GlorotUniform",
+    "tf.keras.layers.dot",
+    "tf.keras.metrics.get",
+    "tf.keras.layers.experimental.preprocessing.RandomHeight",
+    "tf.keras.losses.kullback_leibler_divergence",
+    "tf.losses.Poisson",
+    "tf.initializers.Identity",
+    "tf.keras.metrics.SensitivityAtSpecificity",
+    "tf.keras.metrics.FalsePositives",
+    "tf.where",
+    "tf.dynamic_stitch",
+    "tf.IndexedSlices",
+    "tf.linalg.LinearOperatorIdentity",
+    "tf.cos",
+    "tf.linalg.expm",
+    "tf.math.cosh",
+    "tf.floor",
+    "tf.fingerprint",
+    "tf.while_loop"
+  ],
+  "used_apis": [
+    "tf.keras.layers.Dense",
+    "tf.keras.initializers.GlorotUniform",
+    "tf.keras.layers.BatchNormalization",
+    "tf.keras.layers.LayerNormalization",
+    "tf.keras.layers.Activation",
+    "tf.cos",
+    "tf.math.cosh",
+    "tf.GradientTape",
+    "tf.device",
+    "tf.optimizers.Adadelta"
+  ],
+  "timestamp": "20260416_183049",
+  "model_file": "/home/binduan/myspace/smolfuzz/results/clean_run_tf/models/model_0029.py"
+}

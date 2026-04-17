@@ -1,0 +1,38 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 102,
+  "mutation": "add_noise",
+  "detail": "rel_err=1.094e+02 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+  "apis_selected": [
+    "tf.keras.optimizers.Optimizer",
+    "tf.keras.layers.RandomHeight",
+    "tf.keras.initializers.Ones",
+    "tf.losses.KLD",
+    "tf.losses.mean_absolute_percentage_error",
+    "tf.initializers.VarianceScaling",
+    "tf.nn.weighted_cross_entropy_with_logits",
+    "tf.initializers.HeNormal",
+    "tf.metrics.PrecisionAtRecall",
+    "tf.keras.layers.Permute",
+    "tf.keras.layers.experimental.preprocessing.Hashing",
+    "tf.sequence_mask",
+    "tf.as_dtype",
+    "tf.math.special.bessel_k0e",
+    "tf.acosh",
+    "tf.tanh",
+    "tf.histogram_fixed_width",
+    "tf.math.special.bessel_k0",
+    "tf.math.is_non_decreasing",
+    "tf.signal.fftshift"
+  ],
+  "used_apis": [
+    "tf.keras.layers.Dense",
+    "tf.keras.initializers.HeNormal",
+    "tf.tanh",
+    "tf.keras.layers.BatchNormalization",
+    "tf.keras.layers.LayerNormalization",
+    "tf.GradientTape"
+  ],
+  "timestamp": "20260416_204116",
+  "model_file": "/home/binduan/myspace/smolfuzz/results/clean_run_tf/models/model_0102.py"
+}

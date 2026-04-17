@@ -1,0 +1,42 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 36,
+  "mutation": "scale_large",
+  "detail": "rel_err=2.360e+05 > 100.0\u00d7tol  rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00 dtype=float32 n=32",
+  "apis_selected": [
+    "tf.keras.optimizers.SGD",
+    "tf.keras.initializers.RandomUniform",
+    "tf.keras.layers.Hashing",
+    "tf.losses.poisson",
+    "tf.metrics.mean_squared_error",
+    "tf.keras.layers.GlobalMaxPooling1D",
+    "tf.metrics.Precision",
+    "tf.losses.cosine_similarity",
+    "tf.keras.constraints.unit_norm",
+    "tf.nn.swish",
+    "tf.keras.metrics.Sum",
+    "tf.split",
+    "tf.py_function",
+    "tf.math.squared_difference",
+    "tf.maximum",
+    "tf.math.lgamma",
+    "tf.math.polygamma",
+    "tf.reduce_min",
+    "tf.linalg.LinearOperatorKronecker",
+    "tf.RegisterGradient"
+  ],
+  "used_apis": [
+    "tf.keras.layers.Dense",
+    "tf.keras.initializers.RandomUniform",
+    "tf.keras.layers.Hashing",
+    "tf.keras.constraints.unit_norm",
+    "tf.nn.swish",
+    "tf.GradientTape",
+    "tf.metrics.Sum",
+    "tf.maximum",
+    "tf.device",
+    "tf.zeros_like"
+  ],
+  "timestamp": "20260416_184504",
+  "model_file": "/home/binduan/myspace/smolfuzz/results/clean_run_tf/models/model_0036.py"
+}

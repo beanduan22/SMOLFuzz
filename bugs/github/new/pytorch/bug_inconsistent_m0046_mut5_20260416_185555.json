@@ -1,0 +1,27 @@
+{
+  "bug_type": "inconsistent",
+  "model_id": 46,
+  "mutation_id": 5,
+  "mutation_name": "scale_large",
+  "cpu_status": "ok",
+  "gpu_status": "ok",
+  "detail": "output[0]: rel_err=1.631e+02 > 1.0 dtype=torch.float32 shape=[4, 4] rtol=1e-04 atol=1e-05 nondet_floor=0.000e+00",
+  "used_apis": [
+    "torch.nn.Linear",
+    "torch.nn.BatchNorm1d",
+    "torch.nn.Mish",
+    "torch.nn.functional.hardswish",
+    "torch.nn.functional.threshold_",
+    "torch.fmod",
+    "torch.exp",
+    "torch.sin",
+    "torch.enable_grad"
+  ],
+  "timestamp": "20260416_185555",
+  "artifacts": {
+    "inputs": "bug_inconsistent_m0046_mut5_20260416_185555.inputs.pt",
+    "cpu_outputs": "bug_inconsistent_m0046_mut5_20260416_185555.cpu_out.pt",
+    "gpu_outputs": "bug_inconsistent_m0046_mut5_20260416_185555.gpu_out.pt",
+    "reproducer": "bug_inconsistent_m0046_mut5_20260416_185555.repro.py"
+  }
+}
