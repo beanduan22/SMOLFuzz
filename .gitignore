@@ -26,6 +26,9 @@ workspace/
 *.pt
 *.pt.inputs.pt
 
+# Claude Code session files
+.claude/
+
 # Logs
 *.log
 
