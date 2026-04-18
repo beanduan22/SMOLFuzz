@@ -1,0 +1,11 @@
+# Core runtime
+torch>=2.0.0
+requests>=2.28.0
+
+# TensorFlow fuzzing (run_tf.py)
+tensorflow>=2.13.0
+numpy>=1.23.0
+
+# Optional LLM backends (install only what you use)
+# openai>=1.0.0          # for OpenAIClient
+# anthropic>=0.20.0      # for AnthropicClient
