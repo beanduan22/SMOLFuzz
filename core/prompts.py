@@ -1,18 +1,3 @@
-"""
-Prompt templates for SMOLFuzz model synthesis and self-repair.
-
-Based on Appendix B of the SMOLFuzz paper, adapted for PyTorch.
-Three dependency types are exercised:
-  1. Computational graph  – autograd / gradient scopes
-  2. Mode                 – train() / eval(), no_grad / enable_grad
-  3. Concurrency          – torch.no_grad / enable_grad context managers,
-                            inference_mode
-"""
-
-# ------------------------------------------------------------------ #
-# Few-shot examples showing each dependency type                      #
-# ------------------------------------------------------------------ #
-
 _EXAMPLE_GRAD = '''
 # Example – Computational-graph dependency
 import torch, torch.nn as nn
@@ -99,10 +84,6 @@ USED_APIS = ["torch.nn.Linear", "torch.relu", "torch.no_grad",
 FEW_SHOT_EXAMPLES = "\n".join([_EXAMPLE_GRAD, _EXAMPLE_MODE, _EXAMPLE_CTX])
 
 
-# ------------------------------------------------------------------ #
-# Synthesis prompt                                                     #
-# ------------------------------------------------------------------ #
-
 SYNTHESIS_TEMPLATE = """You are an expert PyTorch developer. Write ONE complete, self-contained, executable Python script that tests PyTorch library behavior using the given APIs.
 
 **Target library**: PyTorch
@@ -161,10 +142,6 @@ Write the complete script now. Output ONLY valid Python code — no markdown, no
 """
 
 
-# ------------------------------------------------------------------ #
-# Self-repair prompt                                                   #
-# ------------------------------------------------------------------ #
-
 REPAIR_TEMPLATE = """The following PyTorch model script failed during execution.
 
 **Error** (read carefully):
@@ -203,14 +180,10 @@ def build_synthesis_prompt(api_list: list[str]) -> str:
 
 def build_repair_prompt(original_code: str, error: str) -> str:
     return REPAIR_TEMPLATE.format(
-        error=error[:2000],          # truncate very long tracebacks
+        error=error[:2000],
         original_code=original_code,
     )
 
-
-# ------------------------------------------------------------------ #
-# TensorFlow prompts                                                  #
-# ------------------------------------------------------------------ #
 
 _TF_EXAMPLE_GRAD = '''
 # Example – Computational-graph dependency (TF GradientTape)

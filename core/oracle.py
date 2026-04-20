@@ -1,45 +1,3 @@
-"""
-Differential testing oracle — CPU vs GPU output comparison.
-
-False-positive prevention (what breaks naive L2-threshold oracles):
-
-  1. GPU non-determinism. Ops like scatter_add / index_add / segment_sum
-     produce different results on two successive GPU runs with the SAME
-     input. We run GPU twice, treat any CPU/GPU discrepancy smaller than
-     GPU-vs-GPU as device-level noise and drop it.
-
-  2. Float16 / bfloat16 expected loss. float16 has ~1e-3 relative precision.
-     An absolute L2 threshold of 1e-3 false-positives on every f16 reduction.
-     We use per-dtype relative tolerance, matching torch.allclose defaults:
-        float64 → rtol=1e-5  atol=1e-8
-        float32 → rtol=1e-4  atol=1e-5
-        bfloat16→ rtol=1e-2  atol=1e-2
-        float16 → rtol=1e-2  atol=1e-3
-
-  3. Large-magnitude outputs. |cpu - gpu| scales with ||cpu||. We compute
-        rel_err = max_i |cpu_i - gpu_i| / (atol + rtol * |cpu_i|)
-     and flag only when rel_err > 1.
-
-  4. Asymmetric NaN from rounding order. A single NaN position in a 1M
-     element tensor is usually not a bug. We require at least max(4, 0.1%)
-     of positions to be asymmetric.
-
-  5. Generation failures with different wording across devices. When CPU
-     and GPU both crash we normalise the message (strip "CUDA " / "cuda:N"
-     prefixes, keywords) before comparing.
-
-  6. Argmax / sort / topk index flips under tied values. Integer outputs
-     are compared with index-tolerance when a companion float output also
-     differs by > rtol.
-
-Classifies each ExecutionPair as:
-  CRASH              – single-device crash or different-root-cause crashes
-  NAN                – genuine asymmetric non-finite values
-  INCONSISTENT       – numerically different beyond dtype-aware tolerance
-  GENERATION_FAILURE – both devices crash with same root cause
-  NONDET             – GPU-vs-GPU diff exceeds CPU-vs-GPU diff (not a bug)
-  CLEAN              – no anomaly
-"""
 from __future__ import annotations
 
 import json
@@ -58,26 +16,17 @@ from .executor import ExecutionPair, RunResult
 logger = logging.getLogger(__name__)
 
 
-# Per-dtype (rtol, atol) — mirrors torch.allclose defaults but slightly looser
-# to account for the fact that the same model can legitimately differ on CPU
-# vs GPU by orders of kernel rounding error.
 _TOL: dict = {
     torch.float64: (1e-5, 1e-8),
     torch.float32: (1e-4, 1e-5),
     torch.bfloat16: (1e-2, 1e-2),
     torch.float16: (1e-2, 1e-3),
 }
-# Integer tensors: allow fraction of mismatching positions if the operation
-# is likely an argmax/sort over near-ties. We cap at 1% mismatches.
 _INT_MISMATCH_FRAC = 0.01
 
-# NaN / Inf asymmetry thresholds: allow small rounding-order differences.
-_NAN_ASYM_FRAC = 1e-3   # require > 0.1% asymmetric positions
-_NAN_ASYM_MIN = 4       # AND at least 4 positions (for small outputs)
+_NAN_ASYM_FRAC = 1e-3
+_NAN_ASYM_MIN = 4
 
-# Environmental / infrastructure errors that must NEVER be classified as a
-# library bug. These are almost always transient (OOM, driver resets,
-# scheduler races) and the user explicitly demanded no false positives.
 _INFRA_ERROR_RX = re.compile(
     r"out of memory"
     r"|CUDA_ERROR_OUT_OF_MEMORY|cudaErrorOutOfMemory|cuMemAlloc failed"
@@ -99,8 +48,8 @@ class BugType(str, Enum):
     CRASH = "crash"
     NAN = "nan"
     INCONSISTENT = "inconsistent"
-    GENERATION_FAILURE = "generation_failure"   # code error, not library bug
-    NONDET = "nondet"                            # GPU non-determinism, not a bug
+    GENERATION_FAILURE = "generation_failure"
+    NONDET = "nondet"
     CLEAN = "clean"
 
 
@@ -117,7 +66,6 @@ class OracleReport:
     timestamp: str = ""
 
     def is_bug(self) -> bool:
-        """True only for genuine library bugs (not generation / nondet)."""
         return self.bug_type in (BugType.CRASH, BugType.NAN, BugType.INCONSISTENT)
 
     def is_generation_failure(self) -> bool:
@@ -126,10 +74,6 @@ class OracleReport:
     def is_nondet(self) -> bool:
         return self.bug_type == BugType.NONDET
 
-
-# ──────────────────────────────────────────────────────────────────────────
-# Error-similarity helper — normalises device-specific wording.
-# ──────────────────────────────────────────────────────────────────────────
 
 _DEVICE_PREFIX_RX = re.compile(
     r"CUDA[a-zA-Z_ ]*:?\s*"
@@ -141,23 +85,19 @@ _DEVICE_PREFIX_RX = re.compile(
 
 
 def _normalize_error(err: str) -> Tuple[str, str]:
-    """Strip device noise and return (exc_type, canonical_msg)."""
     if not err:
         return ("", "")
     lines = [l.strip() for l in err.splitlines() if l.strip()]
     exc_line = lines[-1] if lines else err.strip()
-    # "TypeName: message"
     parts = exc_line.split(":", 1)
     exc_type = parts[0].strip()
     exc_msg = parts[1].strip() if len(parts) > 1 else ""
-    # Canonicalise
     exc_msg = _DEVICE_PREFIX_RX.sub("", exc_msg)
     exc_msg = re.sub(r"\s+", " ", exc_msg).lower()
     return exc_type, exc_msg
 
 
 def _errors_are_similar(err1: str, err2: str) -> bool:
-    """True when both errors share the same root cause (code-level issue)."""
     if not err1 or not err2:
         return True
     t1, m1 = _normalize_error(err1)
@@ -166,7 +106,6 @@ def _errors_are_similar(err1: str, err2: str) -> bool:
         return False
     if not m1 or not m2:
         return True
-    # Character overlap on a longer prefix
     n = min(200, len(m1), len(m2))
     if n == 0:
         return True
@@ -174,20 +113,11 @@ def _errors_are_similar(err1: str, err2: str) -> bool:
     return common / n > 0.55
 
 
-# ──────────────────────────────────────────────────────────────────────────
-# Numerical comparison helpers.
-# ──────────────────────────────────────────────────────────────────────────
-
-
 def _dtype_tol(t: torch.Tensor) -> Tuple[float, float]:
-    """Return (rtol, atol) for the given tensor's dtype."""
     return _TOL.get(t.dtype, (1e-4, 1e-5))
 
 
 def _align_dtype(cpu: torch.Tensor, gpu: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Tuple[float, float]]:
-    """Cast both to the common (more permissive) dtype for comparison."""
-    # Rank dtypes by precision — less precise wins so tolerance matches
-    # the lower-precision dtype.
     ranking = {
         torch.float64: 4,
         torch.float32: 3,
@@ -202,17 +132,12 @@ def _align_dtype(cpu: torch.Tensor, gpu: torch.Tensor) -> Tuple[torch.Tensor, to
 
 
 def _relative_error(c: torch.Tensor, g: torch.Tensor, rtol: float, atol: float) -> float:
-    """
-    max_i |c_i - g_i| / (atol + rtol * |c_i|) over finite positions.
-    A value > 1.0 means the inputs violate torch.allclose(rtol, atol).
-    """
     both_finite = torch.isfinite(c) & torch.isfinite(g)
     if not both_finite.any():
         return 0.0
     c_f = c[both_finite]
     g_f = g[both_finite]
     denom = atol + rtol * c_f.abs()
-    # Avoid zero denom (shouldn't happen with atol>0 but be safe)
     denom = torch.where(denom > 0, denom, torch.full_like(denom, atol + 1e-12))
     return (c_f - g_f).abs().div(denom).max().item()
 
@@ -220,12 +145,6 @@ def _relative_error(c: torch.Tensor, g: torch.Tensor, rtol: float, atol: float) 
 def _sorted_magnitude_error(
     c: torch.Tensor, g: torch.Tensor, rtol: float, atol: float,
 ) -> float:
-    """
-    Compute rel_err between |c| and |g| after sorting. This collapses any
-    permutation-order difference (e.g. eig/svd eigenvalue ordering) so a
-    permutation-only disagreement reports ~0 while a genuine numerical
-    divergence still shows up.
-    """
     c_mag = c.abs().reshape(-1)
     g_mag = g.abs().reshape(-1)
     finite = torch.isfinite(c_mag) & torch.isfinite(g_mag)
@@ -240,9 +159,6 @@ def _sorted_magnitude_error(
     return (c_sorted - g_sorted).abs().div(denom).max().item()
 
 
-# APIs whose output is only defined up to a permutation / sign. Positional
-# CPU-vs-GPU comparison false-positives on these every time; we check the
-# sorted-magnitude metric as a secondary guard.
 _PERMUTATION_INVARIANT_APIS = {
     "torch.linalg.eig", "torch.linalg.eigh", "torch.linalg.eigvals",
     "torch.linalg.eigvalsh", "torch.linalg.svd", "torch.linalg.svdvals",
@@ -265,7 +181,6 @@ def _uses_permutation_invariant_api(apis: List[str]) -> bool:
 
 
 def _nan_inf_asymmetry(c: torch.Tensor, g: torch.Tensor) -> Tuple[int, int, int]:
-    """Return (asym_nan, asym_inf, nan_vs_inf) position counts."""
     cpu_nan = torch.isnan(c); gpu_nan = torch.isnan(g)
     cpu_inf = torch.isinf(c); gpu_inf = torch.isinf(g)
     asym_nan = ((cpu_nan & ~gpu_nan & ~gpu_inf) | (gpu_nan & ~cpu_nan & ~cpu_inf)).sum().item()
@@ -275,16 +190,11 @@ def _nan_inf_asymmetry(c: torch.Tensor, g: torch.Tensor) -> Tuple[int, int, int]
 
 
 def _significant_asymmetry(count: int, total: int) -> bool:
-    """Is `count` asymmetric positions in a tensor of `total` significant?"""
     if total == 0 or count == 0:
         return False
     frac = count / total
     return count >= _NAN_ASYM_MIN and frac >= _NAN_ASYM_FRAC
 
-
-# ──────────────────────────────────────────────────────────────────────────
-# Mutation name table.
-# ──────────────────────────────────────────────────────────────────────────
 
 _MUTATION_NAMES = {
     0: "baseline",
@@ -304,10 +214,6 @@ class DifferentialOracle:
         self._gen_fail_count = 0
         self._nondet_count = 0
         self._clean_count = 0
-
-    # ------------------------------------------------------------------ #
-    # Public                                                              #
-    # ------------------------------------------------------------------ #
 
     def evaluate(
         self, pair: ExecutionPair, used_apis: List[str], model_code: str = "",
@@ -342,10 +248,6 @@ class DifferentialOracle:
             "clean": self._clean_count,
         }
 
-    # ------------------------------------------------------------------ #
-    # Internal                                                            #
-    # ------------------------------------------------------------------ #
-
     def _classify(
         self, pair: ExecutionPair, used_apis: List[str], mut_name: str,
     ) -> OracleReport:
@@ -360,20 +262,14 @@ class DifferentialOracle:
             timestamp=ts,
         )
 
-        # 1) Crash / error triage ----------------------------------------
         cpu_failed = pair.cpu.status in ("crash", "timeout", "error")
         gpu_failed = pair.gpu.status in ("crash", "timeout", "error")
         if cpu_failed or gpu_failed:
-            # Scan the FULL error string for infra keywords — the error
-            # class (e.g. CUBLAS_STATUS_ALLOC_FAILED) typically sits at the
-            # tail of the traceback, past the first 400 chars.
             cpu_err_full = pair.cpu.error if cpu_failed else ""
             gpu_err_full = pair.gpu.error if gpu_failed else ""
             cpu_err = cpu_err_full[:400]
             gpu_err = gpu_err_full[:400]
-            # Infrastructure error on either device — not a library bug.
             if _is_infra_error(cpu_err_full) or _is_infra_error(gpu_err_full):
-                # Show the tail of the traceback so the diagnostic is useful.
                 cpu_tail = cpu_err_full[-200:] if cpu_err_full else ""
                 gpu_tail = gpu_err_full[-200:] if gpu_err_full else ""
                 return OracleReport(
@@ -397,8 +293,6 @@ class DifferentialOracle:
                     detail=f"CPU error: {cpu_err[:200]}\nGPU error: {gpu_err[:200]}",
                     **base,
                 )
-            # Single-device crash — but first check if the surviving device
-            # simply isn't producing numerical output that would diverge.
             failing = "CPU" if cpu_failed else "GPU"
             err = cpu_err if cpu_failed else gpu_err
             return OracleReport(
@@ -412,9 +306,6 @@ class DifferentialOracle:
         if not cpu_outs or not gpu_outs:
             return OracleReport(bug_type=BugType.CLEAN, detail="empty outputs", **base)
 
-        # 2) GPU non-determinism estimate -------------------------------
-        # If a second GPU run is available, compute a per-output nondet
-        # "noise floor". We'll require CPU/GPU diff to exceed this floor.
         gpu_rep = pair.gpu.outputs_repeat
         nondet_floors: List[float] = []
         if gpu_rep and len(gpu_rep) == len(gpu_outs):
@@ -426,7 +317,6 @@ class DifferentialOracle:
                 else:
                     nondet_floors.append(0.0)
 
-        # 3) Asymmetric NaN / Inf ---------------------------------------
         nan_details = []
         for i, (c, g) in enumerate(zip(cpu_outs, gpu_outs)):
             if not isinstance(c, torch.Tensor) or not isinstance(g, torch.Tensor):
@@ -449,7 +339,6 @@ class DifferentialOracle:
                 bug_type=BugType.NAN, detail="; ".join(nan_details), **base,
             )
 
-        # 4) Numerical inconsistency — relative tolerance ---------------
         incons_details = []
         nondet_details = []
         uses_perm_invariant = _uses_permutation_invariant_api(used_apis)
@@ -462,9 +351,6 @@ class DifferentialOracle:
                 )
                 continue
 
-            # Complex tensors: split into (real, imag) and treat each as a
-            # float tensor. Positional comparison on complex values is still
-            # sensitive to permutation (for eig/svd); handled below.
             if c.is_complex():
                 c = torch.cat([c.real, c.imag], dim=-1)
                 g = torch.cat([g.real, g.imag], dim=-1)
@@ -473,7 +359,6 @@ class DifferentialOracle:
                 is_floatlike = c.is_floating_point()
 
             if not is_floatlike:
-                # Integer/bool outputs — allow small fraction of mismatches
                 if not torch.equal(c, g):
                     diff = (c != g).sum().item()
                     total = c.numel() or 1
@@ -486,19 +371,10 @@ class DifferentialOracle:
 
             a, b, (rtol, atol) = _align_dtype(c, g)
             rel = _relative_error(a, b, rtol, atol)
-            # Require a large margin above tolerance to call something a
-            # bug. rel_err of a few × tolerance is expected for models using
-            # autograd, BatchNorm, or reductions (summation-order differences
-            # in f32 kernels). Real library bugs in the reference catalogue
-            # show rel_err of hundreds to thousands; 100× is a conservative
-            # single-sided filter consistent with the paper's no-FP intent.
             BUG_MARGIN = 100.0
             if rel <= BUG_MARGIN:
-                continue  # within expected kernel-rounding margin
+                continue
 
-            # Permutation-invariant APIs (eig/svd/qr/sort/topk/…): compare
-            # sorted magnitudes. If those agree, the positional divergence is
-            # a permutation artifact and NOT a library bug.
             if uses_perm_invariant:
                 sorted_rel = _sorted_magnitude_error(a, b, rtol, atol)
                 if sorted_rel <= 1.0:
@@ -509,10 +385,6 @@ class DifferentialOracle:
                     continue
 
             nd_floor = nondet_floors[i] if i < len(nondet_floors) else 0.0
-            # If known-nondet op OR the GPU-vs-GPU noise is of the same order,
-            # the mismatch is noise, not a library bug. We require a 10× margin
-            # over the nondet floor, and reject outright when the floor is
-            # already very high (model is numerically unstable by construction).
             if pair.has_nondet_ops or nd_floor >= 100.0 or rel < max(1.0, 10.0 * nd_floor):
                 nondet_details.append(
                     f"output[{i}]: rel_err={rel:.3e} nondet_floor={nd_floor:.3e} "
@@ -540,10 +412,6 @@ class DifferentialOracle:
             )
 
         return OracleReport(bug_type=BugType.CLEAN, detail="", **base)
-
-    # ------------------------------------------------------------------ #
-    # Report persistence                                                  #
-    # ------------------------------------------------------------------ #
 
     def _save_report(
         self, report: OracleReport, pair: ExecutionPair, model_code: str = "",
@@ -602,10 +470,6 @@ class DifferentialOracle:
             (self._bug_dir / f"{base}.repro.py").write_text(repro)
 
         logger.info("Bug report saved → %s/%s.*", self._bug_dir, base)
-
-    # ------------------------------------------------------------------ #
-    # Reproducer builder                                                  #
-    # ------------------------------------------------------------------ #
 
     @staticmethod
     def _build_reproducer(report: OracleReport, base: str, model_code: str) -> str:
@@ -684,7 +548,7 @@ class DifferentialOracle:
                 f"    bad_out = {bad_model}(*bad_inputs)  # <── expect crash",
                 f"print(f'{crashing.upper()} output: {{bad_out}}')",
             ]
-        else:  # inconsistent / nan
+        else:
             lines += [
                 "",
                 "cpu_inputs = [x.cpu() if isinstance(x, torch.Tensor) else x for x in inputs]",

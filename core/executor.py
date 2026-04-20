@@ -1,20 +1,3 @@
-"""
-Subprocess-based model executor + 5 mutation strategies.
-
-Each model run forks a child process that:
-  1. Executes the LLM-generated code
-  2. Runs Model(*inputs) on the requested device
-  3. Saves the result to a temp file (torch.save)
-
-This isolates crashes (SIGSEGV, SIGABRT) from the main process.
-
-Mutation strategies (paper §3.2):
-  M1  add_noise      – add Gaussian noise (σ=0.1)
-  M2  scale_small    – multiply by U(0.01, 0.1)
-  M3  mask           – zero out random 30% of elements
-  M4  uniform        – set all elements to a constant
-  M5  scale_large    – multiply by U(1e3, 1e6)
-"""
 from __future__ import annotations
 
 import logging
@@ -31,24 +14,11 @@ import torch
 
 logger = logging.getLogger(__name__)
 
-DEVICE_TIMEOUT = 30    # seconds per device run (paper §3.1.3)
-MUTATION_TIMEOUT = 60  # seconds per mutation run
+DEVICE_TIMEOUT = 30
+MUTATION_TIMEOUT = 60
 
-
-# ------------------------------------------------------------------ #
-# Runner template injected around the LLM code                       #
-# ------------------------------------------------------------------ #
 
 _RUNNER_SUFFIX = textwrap.dedent("""
-# ===================== SMOLFuzz runner =====================
-# False-positive prevention:
-#   • .eval() disables Dropout/BatchNorm stochastic behavior
-#   • TF32 off → GPU matmul matches CPU float32 (not ~1e-3 looser)
-#   • cuDNN deterministic=True, benchmark=False → stable kernel choice
-#   • CUBLAS_WORKSPACE_CONFIG :4096:8 → required for deterministic matmul
-#   • use_deterministic_algorithms(True, warn_only=True) → catches non-det ops
-#   • The same run is executed TWICE on GPU; a non-matching pair is marked
-#     "nondet" so the oracle can drop it instead of reporting a false bug.
 if __name__ == "__main__":
     import argparse, os, sys, traceback
     os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
@@ -62,7 +32,6 @@ if __name__ == "__main__":
                         help="Run forward twice and include both outputs")
     args = parser.parse_args()
 
-    # ----- Determinism / precision knobs -----
     try:
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.backends.cudnn.allow_tf32 = False
@@ -90,7 +59,7 @@ if __name__ == "__main__":
             torch.cuda.manual_seed_all(42)
 
         model = Model().to(device)
-        model.eval()                       # disable Dropout / BatchNorm updates
+        model.eval()
 
         device_inputs = []
         for x in inputs:
@@ -114,20 +83,12 @@ if __name__ == "__main__":
                 except Exception:
                     return []
 
-        # NB: not `torch.inference_mode()` — the paper explicitly requires
-        # computational-graph / autograd dependencies to be exercised, which
-        # inference_mode() forbids (in-place ops, grad, etc.). We leave grad
-        # tracking enabled and rely on the model's own context managers
-        # (no_grad, enable_grad, GradientTape) to drive the semantics.
         with torch.set_grad_enabled(True):
             output_a = model(*device_inputs)
         outputs_a = to_cpu_list(output_a)
 
         outputs_b = None
         if args.double_run:
-            # Second run on the same device with identical inputs.
-            # Any difference between outputs_a and outputs_b is
-            # DEVICE-LEVEL non-determinism, not a CPU/GPU library bug.
             torch.manual_seed(42)
             if torch.cuda.is_available():
                 torch.cuda.manual_seed_all(42)
@@ -156,9 +117,7 @@ if __name__ == "__main__":
 
 
 def _strip_main_block(code: str) -> str:
-    """Remove any `if __name__ == '__main__':` block from LLM-generated code."""
     import re
-    # Match from `if __name__` to end of file, handling both quote styles
     cleaned = re.sub(
         r'\nif\s+__name__\s*==\s*[\'"]__main__[\'"]\s*:.*',
         '',
@@ -168,14 +127,6 @@ def _strip_main_block(code: str) -> str:
     return cleaned.rstrip()
 
 
-# Regex that catches LLM-inserted randomness / non-determinism.
-# If the MODEL CODE (inside forward, Model, or make_inputs) contains any of
-# these, we mark the model as generation-invalid: CPU and GPU RNG streams
-# differ so comparing them is guaranteed to false-positive.
-#
-# We deliberately match inside the whole generated script (not only forward)
-# because many LLM-generated models put the random call inside Model.__init__
-# or helper functions.
 import re as _re
 
 _RANDOMNESS_RX = _re.compile(
@@ -192,55 +143,37 @@ _RANDOMNESS_RX = _re.compile(
     r")"
 )
 
-# Ops known to be non-deterministic on CUDA (per the PyTorch docs —
-# https://pytorch.org/docs/stable/generated/torch.use_deterministic_algorithms.html).
-# Models using any of these will get a diff flagged as "nondet" rather than
-# a genuine CPU/GPU library bug.
 _NONDET_GPU_RX = _re.compile(
     r"\b("
-    # Scatter / indexed writes with floating-point values
     r"torch\.(scatter_add|index_add|index_put|index_copy"
     r"|index_reduce|scatter_reduce|scatter)"
     r"|\.scatter_add_?\(|\.index_add_?\(|\.index_put_?\("
     r"|\.scatter_reduce_?\("
-    # Reductions with non-deterministic CUDA kernels
     r"|torch\.(kthvalue|median|cumsum|cumprod|nanmedian|nansum)"
     r"|\.kthvalue\(|\.median\("
-    # Histogram / bincount / unique
     r"|torch\.(histc|bincount|nonzero|repeat_interleave)"
     r"|\.histc\(|\.bincount\(|\.nonzero\("
-    # nn.functional paths
     r"|F\.(embedding_bag|ctc_loss|interpolate"
     r"|upsample(?:_nearest|_bilinear)?|grid_sample|affine_grid"
     r"|max_pool[23]d_with_indices|adaptive_avg_pool[23]d"
     r"|adaptive_max_pool[23]d|avg_pool3d"
     r"|fractional_max_pool[23]d|nll_loss2d"
     r"|replication_pad[23]d|reflection_pad2d)"
-    # nn.* classes
     r"|nn\.EmbeddingBag|nn\.CTCLoss|nn\.Upsample"
     r"|nn\.FractionalMaxPool"
     r"|nn\.AdaptiveMaxPool[23]d|nn\.AdaptiveAvgPool[23]d"
     r"|nn\.MaxPool[23]d|nn\.AvgPool3d"
     r"|nn\.ReflectionPad2d|nn\.ReplicationPad[23]d"
-    # AMP / sparse ops
     r"|torch\.put"
     r")"
 )
 
 
 def _extract_model_body(code: str) -> str:
-    """
-    Return the body of `class Model(...)` and any method it defines.
-
-    `make_inputs()` is allowed to call random ops (the runner persists its
-    output and reuses it identically on CPU and GPU), so we only check
-    randomness inside the Model class.
-    """
     m = _re.search(r"class\s+Model\b[^:]*:", code)
     if not m:
-        return code  # No Model class found → check whole file defensively
+        return code
     start = m.end()
-    # Take lines until we hit a line that is left-aligned (end of class).
     tail = code[start:].splitlines()
     body_lines = [tail[0]] if tail else []
     for line in tail[1:]:
@@ -251,29 +184,19 @@ def _extract_model_body(code: str) -> str:
 
 
 def has_randomness(code: str) -> bool:
-    """True if the Model class body contains randomness that makes CPU/GPU diverge.
-
-    Random calls in make_inputs() are fine — the runner saves make_inputs()
-    output once and reuses the exact same tensor for each device.
-    """
     return bool(_RANDOMNESS_RX.search(_extract_model_body(code)))
 
 
 def has_nondet_gpu_op(code: str) -> bool:
-    """True if the code uses an op that is non-deterministic on GPU."""
     return bool(_NONDET_GPU_RX.search(code))
 
-
-# ------------------------------------------------------------------ #
-# Data structures                                                     #
-# ------------------------------------------------------------------ #
 
 @dataclass
 class RunResult:
     device: str
-    status: str                        # "ok" | "error" | "crash" | "timeout"
+    status: str
     outputs: List[torch.Tensor] = field(default_factory=list)
-    outputs_repeat: Optional[List[torch.Tensor]] = None  # 2nd same-device run
+    outputs_repeat: Optional[List[torch.Tensor]] = None
     error: str = ""
 
 
@@ -282,14 +205,10 @@ class ExecutionPair:
     cpu: RunResult
     gpu: RunResult
     model_id: int
-    mutation_id: int = 0              # 0 = baseline; 1-5 = mutation type
+    mutation_id: int = 0
     inputs: Optional[List[torch.Tensor]] = None
-    has_nondet_ops: bool = False       # Model uses ops known to be nondet on GPU
+    has_nondet_ops: bool = False
 
-
-# ------------------------------------------------------------------ #
-# Mutation helpers                                                    #
-# ------------------------------------------------------------------ #
 
 _MUTATION_NAMES = {
     1: "add_noise",
@@ -301,57 +220,44 @@ _MUTATION_NAMES = {
 
 
 def apply_mutation(inputs: List[torch.Tensor], strategy: int) -> List[torch.Tensor]:
-    """Return mutated copies of input tensors (strategy 1–5)."""
     mutated = []
     for t in inputs:
         if not isinstance(t, torch.Tensor) or not t.is_floating_point():
             mutated.append(t)
             continue
         t = t.clone().float()
-        if strategy == 1:    # add Gaussian noise
+        if strategy == 1:
             t = t + torch.randn_like(t) * 0.1
-        elif strategy == 2:  # multiply by small factor
+        elif strategy == 2:
             f = torch.empty(1).uniform_(0.01, 0.1).item()
             t = t * f
-        elif strategy == 3:  # random masking (30%)
+        elif strategy == 3:
             mask = torch.bernoulli(torch.full_like(t, 0.3)).bool()
             t = t.masked_fill(mask, 0.0)
-        elif strategy == 4:  # uniform constant
+        elif strategy == 4:
             val = torch.randn(1).item()
             t = torch.full_like(t, val)
-        elif strategy == 5:  # large scaling
+        elif strategy == 5:
             f = torch.empty(1).uniform_(1e3, 1e6).item()
             t = t * f
         mutated.append(t)
     return mutated
 
 
-# ------------------------------------------------------------------ #
-# Executor                                                            #
-# ------------------------------------------------------------------ #
-
 class ModelExecutor:
     def __init__(self, output_dir: str | Path) -> None:
         self._output_dir = Path(output_dir)
         self._output_dir.mkdir(parents=True, exist_ok=True)
 
-    # ---- public ---------------------------------------------------- #
-
     def run_baseline(
         self, code: str, model_id: int
     ) -> Tuple[ExecutionPair, Optional[List[torch.Tensor]]]:
-        """Run model with make_inputs() on CPU and GPU. Return pair + inputs.
-
-        GPU is executed twice so the oracle can detect GPU non-determinism
-        and not report it as a CPU/GPU library bug.
-        """
         script = self._write_script(code, model_id)
         cpu_out_file = self._tmp_path(f"m{model_id}_cpu_base.pt")
         gpu_out_file = self._tmp_path(f"m{model_id}_gpu_base.pt")
 
         cpu_result = self._run_subprocess(script, "cpu", None, cpu_out_file)
         inputs = self._load_inputs(cpu_out_file)
-        # Always double-run GPU to expose non-determinism.
         gpu_result = self._run_subprocess(
             script, "cuda", inputs, gpu_out_file, double_run=True,
         )
@@ -371,7 +277,6 @@ class ModelExecutor:
         inputs: List[torch.Tensor],
         strategy: int,
     ) -> ExecutionPair:
-        """Run model with mutated inputs on CPU and GPU (GPU twice)."""
         mutated = apply_mutation(inputs, strategy)
         script = self._write_script(code, model_id)
         cpu_out_file = self._tmp_path(f"m{model_id}_cpu_mut{strategy}.pt")
@@ -392,8 +297,6 @@ class ModelExecutor:
             inputs=mutated,
             has_nondet_ops=has_nondet_gpu_op(code),
         )
-
-    # ---- internal -------------------------------------------------- #
 
     def _write_script(self, code: str, model_id: int) -> Path:
         path = self._output_dir / f"model_{model_id:04d}.py"
@@ -437,12 +340,10 @@ class ModelExecutor:
             return RunResult(device=device, status="crash",
                              error=str(exc))
 
-        # Non-zero exit without output file → crash (SIGSEGV, etc.)
         if proc.returncode != 0 and not out_file.exists():
             err = (proc.stderr or proc.stdout or "")[:500]
             return RunResult(device=device, status="crash", error=err)
 
-        # Load saved result
         if not out_file.exists():
             return RunResult(device=device, status="crash",
                              error="Output file not created")

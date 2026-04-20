@@ -1,60 +1,8 @@
-"""
-Load and classify PyTorch / TensorFlow APIs from the text files into the 11
-functional groups defined in the SMOLFuzz paper.
-
-Groups (from paper Table 1, with actual counts from torch_valid_apis.txt / tf_valid_apis.txt):
-  1.  creation_conversion   - tensor creation and dtype/device conversion       PT=125  TF=38
-  2.  mathematics           - arithmetic, linear algebra, trigonometry           PT=583  TF=306
-  3.  reshaping             - reshape, view, slice, transpose, concat            PT=117  TF=44
-  4.  logical               - comparison, boolean, conditional                   PT=86   TF=18
-  5.  distributions         - probability distributions (parametric families)    PT=15   TF=19
-  6.  forward_layers        - nn layers (Conv, Linear, BN, RNN, Attention …)    PT=288  TF=566
-  7.  gradients_optim       - optimizers and lr schedulers                       PT=28   TF=44
-  8.  storage_serial        - save/load, storage classes                         PT=11   TF=3
-  9.  random_generation     - random tensor generation (NOT selectable)          PT=23   TF=37
-  10. model_io              - hub utilities                                      PT=7    TF=125
-  11. misc                  - everything else                                    PT=20   TF=1025
-
-  Paper target counts: PT total=1329, TF total=2235.
-  Minor discrepancies from paper reflect different API-extraction methods.
-
-Exclusion policy (applied before classification, per paper §3.1.1):
-
-    • random_generation ops are EXCLUDED from the selectable pool because they
-      destroy CPU/GPU determinism and produce false positives in differential
-      testing — every CPU vs GPU comparison would diverge by construction.
-    • Experimental / deprecated APIs (private namespaces ``torch._*``,
-      ``tf.compat.v1.*``, ``tf.experimental.*``) are excluded.
-    • Compiler-oriented front-ends (``torch.jit``, ``torch.fx``,
-      ``torch._dynamo``, ``torch._inductor``, ``torch.compile``,
-      ``torch.export``, ``torch.onnx``, ``tf.function``, ``tf.autograph``,
-      ``tf.tpu.*``, ``tf.xla.*``, ``tf.lite.*``) are excluded — they belong
-      to the compilation stack, not the runtime tensor layer we fuzz.
-    • Distributed / data-loading / device-utility / profiler infrastructure
-      (``torch.distributed``, ``torch.utils.data``, ``torch.cuda.*``,
-      ``torch.backends.*``, ``torch.profiler``, ``torch.futures``,
-      ``torch.overrides``, ``tf.distribute.*``, ``tf.io.*``, ``tf.data.*``,
-      ``tf.summary.*``, ``tf.tpu.*``, ``tf.config.*``) are excluded — they
-      are not numerical operators.
-
-The excluded APIs are still returned in the ``"_excluded"`` group for
-inspection so callers can audit what was filtered.
-"""
 from __future__ import annotations
 import re
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-# --------------------------------------------------------------------- #
-# Exclusion patterns — applied BEFORE classification.                   #
-# Anything matching here is dropped from the selectable pool.           #
-# --------------------------------------------------------------------- #
-
-# Random number generation — would make CPU/GPU differential testing
-# trivially false-positive. EXCLUDED per user requirement and paper text
-# ("we exclude APIs explicitly marked as experimental or deprecated...
-#  random generation is in its own group but is not part of the
-#  numerical fuzzing pool").
 _RANDOM_OP_REGEX = re.compile(
     r"^("
     r"torch\.(rand|randn|randint|randperm|seed|multinomial|poisson|bernoulli|normal)$"
@@ -70,25 +18,23 @@ _RANDOM_OP_REGEX = re.compile(
     r"|tf\.random_uniform$"
     r"|tf\.random_shuffle$"
     r"|tf\.random_crop$"
-    r"|torch\.quasirandom($|\.)"   # Sobol/Halton sequence generators
+    r"|torch\.quasirandom($|\.)"
     r"|tf\.random_normal_initializer$"
     r"|tf\.random_uniform_initializer$"
     r")"
 )
 
-# Experimental / deprecated / private namespaces.
 _PRIVATE_REGEX = re.compile(
     r"^("
-    r"torch\._"                  # torch._dynamo, torch._inductor, torch._refs ...
-    r"|torch\.testing\."          # internal testing helpers
-    r"|tf\.compat\.v1\."          # legacy v1 surface
-    r"|tf\.experimental\."        # experimental
+    r"torch\._"
+    r"|torch\.testing\."
+    r"|tf\.compat\.v1\."
+    r"|tf\.experimental\."
     r"|tf\.compat\.v2\.experimental\."
-    r"|tf\.contrib\."             # removed/legacy
+    r"|tf\.contrib\."
     r")"
 )
 
-# Compiler / tracing front-ends — not the runtime tensor layer.
 _COMPILER_REGEX = re.compile(
     r"^("
     r"torch\.jit($|\.)"
@@ -108,7 +54,6 @@ _COMPILER_REGEX = re.compile(
     r")"
 )
 
-# Distributed / data / device / profiler infrastructure — not numerical ops.
 _INFRA_REGEX = re.compile(
     r"^("
     r"torch\.distributed($|\.)"
@@ -147,28 +92,27 @@ _INFRA_REGEX = re.compile(
     r"|tf\.autodiff($|\.)"
     r"|tf\.types($|\.)"
     r"|tf\.test($|\.)"
-    r"|tf\.raw_ops($|\.)"          # low-level ops; redundant with tf.* aliases
-    r"|tf\.strings($|\.)"          # string processing, not numerical
-    r"|tf\.audio($|\.)"            # audio I/O, not core numerical
-    r"|tf\.image($|\.)"            # image I/O / preprocessing
-    r"|tf\.ragged($|\.)"           # ragged-tensor utilities (structural)
-    r"|tf\.sparse($|\.)"           # sparse-tensor utilities (structural)
-    r"|tf\.compat($|\.)"           # compatibility shims
-    r"|tf\.mlir($|\.)"             # MLIR compiler bridge
-    r"|tf\.nest($|\.)"             # python nest utilities
-    r"|tf\.sets($|\.)"             # set ops on tensors (structural)
-    r"|tf\.quantization($|\.)"     # quantization stack
-    r"|tf\.keras\.preprocessing"   # data preprocessing
-    r"|tf\.keras\.datasets"        # dataset loaders
-    r"|tf\.keras\.utils"           # python helpers
-    r"|tf\.keras\.callbacks"       # training callbacks
-    r"|tf\.assert_"                # assertion helpers
+    r"|tf\.raw_ops($|\.)"
+    r"|tf\.strings($|\.)"
+    r"|tf\.audio($|\.)"
+    r"|tf\.image($|\.)"
+    r"|tf\.ragged($|\.)"
+    r"|tf\.sparse($|\.)"
+    r"|tf\.compat($|\.)"
+    r"|tf\.mlir($|\.)"
+    r"|tf\.nest($|\.)"
+    r"|tf\.sets($|\.)"
+    r"|tf\.quantization($|\.)"
+    r"|tf\.keras\.preprocessing"
+    r"|tf\.keras\.datasets"
+    r"|tf\.keras\.utils"
+    r"|tf\.keras\.callbacks"
+    r"|tf\.assert_"
     r")"
 )
 
 
 def is_excluded(api: str) -> Tuple[bool, str]:
-    """Return (True, reason) if the API should be excluded from the fuzzing pool."""
     if _RANDOM_OP_REGEX.match(api):
         return True, "random_generation"
     if _PRIVATE_REGEX.match(api):
@@ -179,10 +123,6 @@ def is_excluded(api: str) -> Tuple[bool, str]:
         return True, "infrastructure"
     return False, ""
 
-
-# --------------------------------------------------------------------- #
-# Keyword / prefix rules per group (checked in order; first match wins) #
-# --------------------------------------------------------------------- #
 
 _RULES: Dict[str, List[str]] = {
     "gradients_optim": [
@@ -198,25 +138,17 @@ _RULES: Dict[str, List[str]] = {
         "torch.hub.",
     ],
     "random_generation": [
-        # NB: most of these never appear in practice because is_excluded()
-        # drops them upstream of classification. The bucket is kept so the
-        # paper's 11-group taxonomy is preserved structurally.
         "torch.rand", "torch.randn", "torch.randint", "torch.randperm",
         "torch.manual_seed", "torch.seed", "torch.random.",
         "torch.bernoulli", "torch.poisson", "torch.multinomial",
         "torch.normal", "torch.Tensor.random_", "torch.Tensor.bernoulli",
         "torch.Tensor.uniform_", "torch.Tensor.normal_",
-        # Windowing functions are deterministic (not random) — moved to
-        # mathematics below.
     ],
     "forward_layers": [
-        # Catch-all for Keras-style nn.* modules and any nn.functional.* call.
-        # Every class in torch.nn that is a layer/loss/activation lives here.
         "torch.nn.functional.",
         "torch.nn.Sequential", "torch.nn.ModuleList", "torch.nn.ModuleDict",
         "torch.nn.ParameterList", "torch.nn.ParameterDict", "torch.nn.Parameter",
         "torch.nn.Identity", "torch.nn.Flatten", "torch.nn.Unflatten",
-        # Convolutions
         "torch.nn.Conv", "torch.nn.ConvTranspose",
         "torch.nn.Linear", "torch.nn.Bilinear",
         "torch.nn.LazyLinear", "torch.nn.LazyConv1d", "torch.nn.LazyConv2d",
@@ -225,20 +157,15 @@ _RULES: Dict[str, List[str]] = {
         "torch.nn.LazyBilinear",
         "torch.nn.LazyBatchNorm", "torch.nn.LazyInstanceNorm",
         "torch.nn.RNNBase",
-        # Normalisation
         "torch.nn.BatchNorm", "torch.nn.LayerNorm", "torch.nn.GroupNorm",
         "torch.nn.InstanceNorm", "torch.nn.LocalResponseNorm",
         "torch.nn.CrossMapLRN2d", "torch.nn.RMSNorm",
-        # Recurrent
         "torch.nn.RNN", "torch.nn.LSTM", "torch.nn.GRU",
-        # Attention / Transformer
         "torch.nn.Transformer", "torch.nn.TransformerEncoder",
         "torch.nn.TransformerEncoderLayer",
         "torch.nn.TransformerDecoder", "torch.nn.TransformerDecoderLayer",
         "torch.nn.MultiheadAttention",
-        # Embedding
         "torch.nn.Embedding", "torch.nn.EmbeddingBag",
-        # Activations
         "torch.nn.ReLU", "torch.nn.ReLU6", "torch.nn.RReLU",
         "torch.nn.LeakyReLU", "torch.nn.PReLU", "torch.nn.ELU",
         "torch.nn.CELU", "torch.nn.SELU", "torch.nn.GELU",
@@ -250,25 +177,20 @@ _RULES: Dict[str, List[str]] = {
         "torch.nn.Softmax", "torch.nn.Softmax2d", "torch.nn.LogSoftmax",
         "torch.nn.Softmin", "torch.nn.AdaptiveLogSoftmaxWithLoss",
         "torch.nn.GLU", "torch.nn.Threshold",
-        # Dropout
         "torch.nn.Dropout", "torch.nn.AlphaDropout",
         "torch.nn.FeatureAlphaDropout",
-        # Pooling (includes Adaptive, Fractional, LP variants)
         "torch.nn.MaxPool", "torch.nn.AvgPool",
         "torch.nn.AdaptiveMaxPool", "torch.nn.AdaptiveAvgPool",
         "torch.nn.MaxUnpool", "torch.nn.FractionalMaxPool",
         "torch.nn.LPPool",
-        # Padding
         "torch.nn.ReflectionPad", "torch.nn.ReplicationPad",
         "torch.nn.ZeroPad", "torch.nn.ConstantPad",
         "torch.nn.CircularPad",
-        # Upsampling / shuffle
         "torch.nn.Upsample", "torch.nn.UpsamplingNearest",
         "torch.nn.UpsamplingBilinear",
         "torch.nn.PixelShuffle", "torch.nn.PixelUnshuffle",
         "torch.nn.ChannelShuffle",
         "torch.nn.Unfold", "torch.nn.Fold",
-        # Losses (BCE, CTC, Huber, Hinge, KL, L1, MSE, NLL, Multi*, Poisson, ...)
         "torch.nn.BCELoss", "torch.nn.BCEWithLogitsLoss",
         "torch.nn.CrossEntropyLoss", "torch.nn.CTCLoss",
         "torch.nn.L1Loss", "torch.nn.MSELoss", "torch.nn.NLLLoss",
@@ -280,9 +202,7 @@ _RULES: Dict[str, List[str]] = {
         "torch.nn.CosineEmbeddingLoss",
         "torch.nn.MultiLabelMarginLoss", "torch.nn.MultiLabelSoftMarginLoss",
         "torch.nn.MultiMarginLoss", "torch.nn.SoftMarginLoss",
-        # Cell variants (GRU / LSTM / RNN)
         "torch.nn.RNNCell", "torch.nn.GRUCell", "torch.nn.LSTMCell",
-        # Utilities that are still layer-like
         "torch.nn.ZeroPad", "torch.nn.utils.rnn.",
         "torch.nn.utils.spectral_norm", "torch.nn.utils.weight_norm",
         "torch.nn.utils.parametrize", "torch.nn.utils.parametrizations.",
@@ -290,9 +210,7 @@ _RULES: Dict[str, List[str]] = {
         "torch.nn.utils.remove_weight_norm",
         "torch.nn.utils.prune", "torch.nn.utils.parameters_to_vector",
         "torch.nn.utils.vector_to_parameters", "torch.nn.utils.skip_init",
-        # Weight-init helpers
         "torch.nn.init.",
-        # Layer-adjacent utilities
         "torch.nn.CosineSimilarity", "torch.nn.PairwiseDistance",
         "torch.nn.SyncBatchNorm", "torch.nn.modules.",
         "torch.nn.parameter.",
@@ -369,11 +287,9 @@ _RULES: Dict[str, List[str]] = {
         "torch.zeros_like", "torch.ones_like", "torch.empty_like",
         "torch.full_like", "torch.rand_like", "torch.randn_like",
         "torch.randint_like",
-        # Storage types (deprecated but in API list)
         "Storage", "torch.Generator",
     ],
     "mathematics": [
-        # Catch the broad math namespace – checked after specific groups
         "torch.add", "torch.sub", "torch.mul", "torch.div",
         "torch.matmul", "torch.mm", "torch.bmm", "torch.mv",
         "torch.dot", "torch.vdot", "torch.inner", "torch.outer",
@@ -399,7 +315,6 @@ _RULES: Dict[str, List[str]] = {
         "torch.sort", "torch.argsort", "torch.topk", "torch.kthvalue",
         "torch.median", "torch.nanmedian", "torch.nansum", "torch.nanmean",
         "torch.linalg.", "torch.fft.", "torch.special.",
-        # Tensor method equivalents
         "torch.Tensor.abs", "torch.Tensor.add", "torch.Tensor.sub",
         "torch.Tensor.mul", "torch.Tensor.div", "torch.Tensor.pow",
         "torch.Tensor.sqrt", "torch.Tensor.log", "torch.Tensor.exp",
@@ -420,10 +335,8 @@ _RULES: Dict[str, List[str]] = {
         "torch.view_as_complex", "torch.polar", "torch.conj",
         "torch.bincount", "torch.histc", "torch.histogram",
         "torch.norm", "torch.dist", "torch.trace",
-        # Signal-processing windows (deterministic, not random)
         "torch.bartlett_window", "torch.blackman_window",
         "torch.hamming_window", "torch.hann_window", "torch.kaiser_window",
-        # Linear algebra and statistics on tensors
         "torch.cholesky", "torch.cholesky_inverse", "torch.cholesky_solve",
         "torch.det", "torch.slogdet", "torch.logdet",
         "torch.qr", "torch.svd", "torch.symeig", "torch.lu",
@@ -447,21 +360,18 @@ _RULES: Dict[str, List[str]] = {
         "torch.einsum", "torch.tensordot",
         "torch.conj_physical", "torch.complex", "torch.resolve_conj",
         "torch.resolve_neg",
-        # More math ops living in the top-level torch namespace
         "torch.block_diag", "torch.cdist", "torch.cartesian_prod",
         "torch.combinations", "torch.meshgrid",
         "torch.fmax", "torch.fmin", "torch.fix", "torch.frexp",
         "torch.ldexp", "torch.msort", "torch.mode",
         "torch.cumulative_trapezoid", "torch.trapezoid",
         "torch.igamma", "torch.igammac",
-        # Tensor methods still living in misc
         "torch.Tensor.solve", "torch.Tensor.sspaddmm",
         "torch.Tensor.tril_", "torch.Tensor.triu_",
         "torch.pca_lowrank", "torch.sigmoid", "torch.renorm",
         "torch.sparse.", "torch.nanmean", "torch.nanmedian",
         "torch.nanquantile", "torch.nansum",
         "torch.stft", "torch.xlogy",
-        # Missing atomic math ops
         "torch.divide", "torch.multiply", "torch.subtract",
         "torch.negative", "torch.maximum", "torch.minimum",
         "torch.ger", "torch.take", "torch.trapz",
@@ -470,10 +380,8 @@ _RULES: Dict[str, List[str]] = {
     ],
 }
 
-# fallback
 _MISC = "misc"
 
-# Method-name suffixes used to reclassify torch.Tensor.* that fall through
 _TENSOR_MATH_SUFFIXES = {
     "abs", "absolute", "acos", "acosh", "add", "addbmm", "addcdiv",
     "addcmul", "addmm", "addmv", "addr", "angle", "arccos", "arccosh",
@@ -570,11 +478,10 @@ _TENSOR_LOGICAL_SUFFIXES = {
     "masked_select",
 }
 
-_TENSOR_GRAD_SUFFIXES: set = set()  # Tensor gradient methods fall to misc (paper §3.1.1)
+_TENSOR_GRAD_SUFFIXES: set = set()
 
 
 def _classify_tensor_method(api: str) -> str:
-    """Classify torch.Tensor.<method> by method name."""
     method = api.split(".")[-1]
     if method in _TENSOR_MATH_SUFFIXES:
         return "mathematics"
@@ -590,21 +497,6 @@ def _classify_tensor_method(api: str) -> str:
 
 
 def _matches(api: str, kw: str) -> bool:
-    """Match `api` against keyword `kw`.
-
-    Rules (in order):
-      • Exact match: ``api == kw``                              → True
-      • ``kw`` ends with '.': module prefix match
-          e.g. ``torch.fft.`` matches ``torch.fft.fft``
-      • ``kw`` ends with '_': snake-case family prefix match
-          e.g. ``torch.logical_`` matches
-          ``torch.logical_and`` / ``torch.logical_or`` / ``torch.logical_not``.
-      • Otherwise: require a word boundary after ``kw`` — the next character
-        must be non-alphabetic (digit, punctuation, underscore, or end).
-        ``torch.nn.Conv``    matches ``torch.nn.Conv2d`` (next '2' is digit) ✓
-        ``torch.Tensor.abs`` matches ``torch.Tensor.abs_`` (next '_') ✓
-        ``torch.t``          does NOT match ``torch.tensor`` (next 'e' alpha) ✗
-    """
     if api == kw:
         return True
     if kw.endswith(".") or kw.endswith("_"):
@@ -620,13 +512,8 @@ def _classify_api(api: str) -> str:
         for kw in keywords:
             if _matches(api, kw):
                 return group
-    # Fallback: torch.Tensor.* method name matching
     if api.startswith("torch.Tensor."):
         return _classify_tensor_method(api)
-    # Standard storage classes → storage/serialisation group.
-    # Quantised (QInt*, QUInt*), complex, and bfloat16 variants stay in
-    # creation_conversion because they are dtype/conversion objects, not
-    # serialisation primitives.
     if api.endswith("Storage") and not any(
         q in api for q in ("QInt", "QUInt", "Complex", "BFloat")
     ):
@@ -636,10 +523,6 @@ def _classify_api(api: str) -> str:
     return _MISC
 
 
-# --------------------------------------------------------------------- #
-# TensorFlow rule set                                                   #
-# --------------------------------------------------------------------- #
-
 _TF_RULES: Dict[str, List[str]] = {
     "gradients_optim": [
         "tf.keras.optimizers.", "tf.optimizers.", "tf.GradientTape",
@@ -648,7 +531,6 @@ _TF_RULES: Dict[str, List[str]] = {
     ],
     "distributions": [
         "tf.distributions.", "tfp.distributions.",
-        # TF2 native sampling ops that represent parametric distributions
         "tf.random.categorical", "tf.random.gamma", "tf.random.poisson",
         "tf.random.stateless_binomial", "tf.random.stateless_gamma",
         "tf.random.stateless_poisson",
@@ -790,14 +672,7 @@ def _classify_tf_api(api: str) -> str:
     return _MISC
 
 
-# --------------------------------------------------------------------- #
-# Public loader                                                         #
-# --------------------------------------------------------------------- #
-
-
 _GROUP_ORDER = list(_RULES.keys()) + [_MISC]
-# Random generation lives only in the excluded bucket — no in-pool group.
-# The 11 paper groups are: the 10 above + "random_generation" (excluded pool).
 
 
 def _classify(api: str, framework: str) -> str:
@@ -812,20 +687,6 @@ def load_and_classify(
     framework: str | None = None,
     drop_excluded: bool = True,
 ) -> Dict[str, List[str]]:
-    """Return ``{group_name: [api, ...]}``.
-
-    Parameters
-    ----------
-    api_file
-        Path to a newline-delimited list of API strings.
-    framework
-        ``"torch"`` or ``"tf"``. If ``None``, inferred from the filename.
-    drop_excluded
-        When True (default), excluded APIs (random ops, compiler front-ends,
-        infrastructure, private namespaces) are placed in the ``"_excluded"``
-        bucket and NOT in any selectable group. When False, they are
-        classified anyway — useful for diagnostics only.
-    """
     path = Path(api_file)
     if framework is None:
         name = path.name.lower()
@@ -840,11 +701,6 @@ def load_and_classify(
         excluded, reason = is_excluded(api)
         if excluded:
             if reason == "random_generation":
-                # Some APIs caught by the random regex are parametric distributions
-                # (e.g. tf.random.categorical, tf.random.gamma).  Let the group
-                # rules override: if _classify() returns "distributions" the API
-                # goes into the selectable pool; otherwise it stays in random_generation
-                # (excluded from selection per paper §3.1.1).
                 group = _classify(api, framework)
                 if group == "distributions":
                     groups["distributions"].append(api)

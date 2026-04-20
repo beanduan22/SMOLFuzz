@@ -1,16 +1,3 @@
-"""
-LLM backend abstraction for SMOLFuzz.
-
-To swap backends, implement the LLMBackend protocol and pass your instance
-to ModelSynthesizer:
-
-    from smolfuzz.backends.llm_client import LLMBackend, OllamaClient, OpenAIClient
-
-    client = OllamaClient()                                    # Ollama (default)
-    client = OpenAIClient(model="gpt-4-turbo")                 # OpenAI GPT-4 Turbo
-    client = AnthropicClient(model="claude-3-5-sonnet-20241022")  # Claude 3.5
-    synthesizer = ModelSynthesizer(client)
-"""
 from __future__ import annotations
 
 import json
@@ -23,40 +10,19 @@ import requests
 logger = logging.getLogger(__name__)
 
 
-# ------------------------------------------------------------------ #
-# Backend Protocol — implement this to add a new LLM backend         #
-# ------------------------------------------------------------------ #
-
 @runtime_checkable
 class LLMBackend(Protocol):
-    """Minimal interface every LLM backend must satisfy."""
 
     @property
     def current_model(self) -> str:
-        """Human-readable name of the model currently in use."""
         ...
 
     def generate(self, prompt: str, advance: bool = True) -> str:
-        """
-        Send *prompt* to the LLM and return the response text.
-
-        ``advance`` hints that the caller is starting a new independent
-        generation; backends that round-robin over multiple models may
-        advance their pointer when this is True and hold it during
-        self-repair loops when it is False.
-
-        Raises RuntimeError on unrecoverable communication errors.
-        """
         ...
 
     def stats(self) -> dict:
-        """Return a JSON-serialisable dict with usage statistics."""
         ...
 
-
-# ------------------------------------------------------------------ #
-# Ollama backend (local, open-source models)                         #
-# ------------------------------------------------------------------ #
 
 OLLAMA_URL = "http://localhost:11434"
 
@@ -67,11 +33,6 @@ _DEFAULT_OLLAMA_MODELS = [
 
 
 class OllamaClient:
-    """
-    HTTP client for a local Ollama server.  Round-robins across *models*.
-
-    Compatible with any model served by ``ollama run <model>``.
-    """
 
     def __init__(
         self,
@@ -145,17 +106,7 @@ class OllamaClient:
         return {"call_counts": dict(self._call_counts), "next_model": self.current_model}
 
 
-# ------------------------------------------------------------------ #
-# OpenAI backend                                                      #
-# ------------------------------------------------------------------ #
-
 class OpenAIClient:
-    """
-    OpenAI-compatible backend (OpenAI, Together AI, Fireworks, etc.).
-
-    Install: pip install openai
-    Set:     OPENAI_API_KEY=sk-...
-    """
 
     def __init__(
         self,
@@ -196,17 +147,7 @@ class OpenAIClient:
         return {"call_counts": {self._model: self._call_count}, "next_model": self._model}
 
 
-# ------------------------------------------------------------------ #
-# Anthropic backend                                                   #
-# ------------------------------------------------------------------ #
-
 class AnthropicClient:
-    """
-    Anthropic Claude backend.
-
-    Install: pip install anthropic
-    Set:     ANTHROPIC_API_KEY=sk-ant-...
-    """
 
     def __init__(
         self,

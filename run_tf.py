@@ -1,21 +1,3 @@
-"""
-SMOLFuzz — TensorFlow track.
-
-Pipeline (mirrors the paper):
-  1. api_loader.load_and_classify(..., framework="tf")  — 11 groups
-  2. MultiRouletteSelector                               — Eq. 1/2/3
-  3. LLM synthesis with three dependency-type few-shot examples
-     + self-repair loop                                  — §3.1.3 / Appendix prompt
-  4. 5-strategy tensor mutation fuzzing, 60s budget      — §3.2
-  5. CPU/GPU differential oracle                         — §3.3
-        • CRASH / NAN / INCONSISTENT
-        • dtype-aware relative tolerance (no FPs on f16 reductions)
-        • symmetric NaN/Inf is NOT a bug
-        • baseline crash ⇒ invalid model (never reported as a library bug)
-
-Usage:
-    python3 run_tf.py --models 500 --budget 60 --out results/tf_500
-"""
 from __future__ import annotations
 
 import argparse
@@ -51,11 +33,6 @@ logging.basicConfig(
 )
 log = logging.getLogger("tf_fuzz")
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Subprocess wrapper that runs a model twice on CPU and twice on GPU and
-# returns the outputs as lists. Double-run on GPU exposes GPU non-determinism.
-# ─────────────────────────────────────────────────────────────────────────────
-
 _WRAPPER = r"""
 import os, sys, json, traceback
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -70,9 +47,7 @@ for _g in tf.config.list_physical_devices('GPU'):
     except Exception:
         pass
 
-# ── LLM-generated class body ──────────────────────────────────────────────
 {model_src}
-# ─────────────────────────────────────────────────────────────────────────
 
 input_file = sys.argv[1]
 x_np = np.load(input_file).astype(np.float32)
@@ -88,7 +63,6 @@ try:
     def _flatten(t):
         return np.array(t, dtype=np.float64).flatten().tolist()
 
-    # Build CPU model and initialise weights with a fixed seed.
     tf.random.set_seed(42)
     with tf.device('/CPU:0'):
         model_cpu = Model()
@@ -101,7 +75,6 @@ try:
         x_gpu = tf.constant(x_np)
         _ = model_gpu(x_gpu, training=False)
 
-    # Copy CPU → GPU weights so both models hold the exact same parameters.
     if len(model_cpu.variables) == len(model_gpu.variables):
         for vc, vg in zip(model_cpu.variables, model_gpu.variables):
             vg.assign(tf.cast(vc, vg.dtype))
@@ -123,8 +96,6 @@ except Exception:
 print(json.dumps(result))
 """
 
-# Quick CPU-only sanity check so we skip obviously broken LLM output before
-# loading the GPU driver (cuts wasted compute dramatically).
 _VALIDATOR = r"""
 import os, sys, traceback
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -149,10 +120,6 @@ except Exception:
 """
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Source extraction / randomness gate
-# ─────────────────────────────────────────────────────────────────────────────
-
 _RANDOMNESS_RX = re.compile(
     r"\b("
     r"tf\.random\."
@@ -165,7 +132,6 @@ _RANDOMNESS_RX = re.compile(
 
 
 def _extract_class(text: str) -> str | None:
-    """Extract `class Model(...)` from the raw LLM reply."""
     text = re.sub(r"```[a-z]*\n?", "", text).strip()
     text = re.sub(r"```\s*$", "", text).strip()
     m = re.search(r"(class\s+Model\b.*?)(?=\nclass\s|\Z)", text, re.DOTALL)
@@ -189,13 +155,8 @@ def _extract_used_apis(src: str) -> list[str]:
 
 
 def _has_random_in_model(src: str) -> bool:
-    """True if the model class uses a stochastic op (FP source)."""
     return bool(_RANDOMNESS_RX.search(src))
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Synthesis + repair
-# ─────────────────────────────────────────────────────────────────────────────
 
 MAX_REPAIR_ATTEMPTS = 3
 
@@ -208,11 +169,6 @@ def synthesize_tf_model(
     x_val: np.ndarray,
     validator_timeout: int = 40,
 ) -> tuple[str | None, list[str], int]:
-    """
-    Generate a TF model class for the given API list and return
-        (source_or_None, used_apis, attempts).
-    Uses a self-repair loop of up to MAX_REPAIR_ATTEMPTS rounds.
-    """
     prompt = build_tf_synthesis_prompt(apis)
     try:
         raw = llm.generate(prompt, advance=True)
@@ -255,7 +211,6 @@ def synthesize_tf_model(
 def _cpu_validate(
     src: str, x_np: np.ndarray, ws_dir: Path, mid: int, timeout: int,
 ) -> str | None:
-    """Return None on success, or a short error string."""
     script_path = ws_dir / f"validate_{mid:04d}_{os.getpid()}.py"
     inp_path = ws_dir / f"validate_inp_{mid:04d}_{os.getpid()}.npy"
     try:
@@ -283,14 +238,9 @@ def _cpu_validate(
                 pass
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Comparison run
-# ─────────────────────────────────────────────────────────────────────────────
-
 def run_comparison(
     src: str, x_np: np.ndarray, ws_dir: Path, mid: int, timeout: int = 90,
 ) -> dict:
-    """Run the LLM-generated model on CPU + GPU (GPU twice)."""
     script_path = ws_dir / f"run_{mid:04d}_{os.getpid()}.py"
     inp_path = ws_dir / f"inp_{mid:04d}_{os.getpid()}.npy"
     result: dict = {
@@ -330,14 +280,6 @@ def run_comparison(
     return result
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Oracle
-# ─────────────────────────────────────────────────────────────────────────────
-
-# Dtype-aware (rtol, atol). Mirrors the PyTorch oracle; keeps the paper's
-# "standard floating-point comparison" semantics but uses relative error so
-# large-magnitude outputs (e.g. under scale_large mutation) do not FP the
-# L2 threshold.
 _TOL = {
     "float64": (1e-5, 1e-8),
     "float32": (1e-4, 1e-5),
@@ -348,7 +290,6 @@ _TOL = {
 _NAN_ASYM_FRAC = 1e-3
 _NAN_ASYM_MIN = 4
 
-# Infrastructure errors that must never be classified as a library bug.
 _INFRA_ERROR_RX = re.compile(
     r"out of memory"
     r"|CUDA_ERROR_OUT_OF_MEMORY|cudaErrorOutOfMemory"
@@ -364,8 +305,6 @@ def _is_infra_error(err: str | None) -> bool:
     return bool(err) and bool(_INFRA_ERROR_RX.search(err))
 
 
-# TF APIs whose output is only defined up to a permutation / sign.
-# Positional CPU-vs-GPU comparison false-positives on these.
 _PERMUTATION_INVARIANT_TF_APIS = {
     "tf.linalg.eig", "tf.linalg.eigh", "tf.linalg.svd",
     "tf.linalg.qr", "tf.linalg.lu", "tf.linalg.cholesky",
@@ -402,15 +341,6 @@ def compare_outputs(
     cpu_out, gpu_out, gpu_repeat=None, cpu_dtype: str | None = None,
     used_apis: list[str] | None = None,
 ) -> tuple[str | None, str]:
-    """
-    Classify (cpu, gpu, gpu_repeat) as CRASH / NAN / INCONSISTENT / None.
-
-    • Symmetric NaN/Inf ⇒ no bug (expected math).
-    • Asymmetric NaN/Inf positions ≥ max(4, 0.1%) ⇒ NAN bug.
-    • Numeric divergence beyond dtype-aware rel_err, and beyond GPU-vs-GPU
-      non-determinism, AND beyond sorted-magnitude tolerance for decomp
-      APIs (eig/svd/qr/sort/…) ⇒ INCONSISTENT bug.
-    """
     if cpu_out is None or gpu_out is None:
         return None, ""
 
@@ -434,22 +364,14 @@ def compare_outputs(
 
     both_finite = ~(cpu_nan | gpu_nan | cpu_inf | gpu_inf)
     if not np.any(both_finite):
-        return None, ""  # all non-finite but symmetric
+        return None, ""
 
     rtol, atol = _TOL.get(cpu_dtype or "float32", (1e-4, 1e-5))
     rel = _relative_error(a, b, rtol, atol)
-    # Require a large margin above tolerance to call something a bug.
-    # rel_err of a few × tolerance is expected for models using GradientTape,
-    # BatchNorm, or reductions (summation-order differences in f32 kernels).
-    # Real library bugs in the reference catalogue show rel_err of hundreds
-    # to thousands; 100× tolerance is a conservative single-sided filter.
     BUG_MARGIN = 100.0
     if rel <= BUG_MARGIN:
         return None, ""
 
-    # Permutation-invariant APIs: compare sorted magnitudes as a secondary
-    # check. If sorted agrees, positional divergence is a permutation
-    # artifact, NOT a library bug.
     if used_apis and _uses_permutation_invariant_tf(used_apis):
         ca = np.abs(a[both_finite]); gb_m = np.abs(b[both_finite])
         if ca.size == gb_m.size and ca.size > 0:
@@ -463,16 +385,11 @@ def compare_outputs(
                     f"→ permutation artifact on a decomp API, not a bug"
                 )
 
-    # GPU non-determinism floor.
     nd_floor = 0.0
     if gpu_repeat is not None:
         g2 = np.asarray(gpu_repeat, dtype=np.float64)
         if g2.size == b.size:
             nd_floor = _relative_error(b, g2, rtol, atol)
-    # If the model is highly non-deterministic on a single device
-    # (nd_floor already far above tolerance), any CPU-vs-GPU diff is noise,
-    # not a library bug. Require a strong 10× margin over the nondet floor
-    # AND reject outright when the floor is already very high.
     if nd_floor >= 100.0:
         return None, (
             f"rel_err={rel:.3e} but GPU is highly non-deterministic "
@@ -486,10 +403,6 @@ def compare_outputs(
         f"nondet_floor={nd_floor:.3e} dtype={cpu_dtype} n={total}"
     )
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Mutations (paper §3.2 — same order as PT)
-# ─────────────────────────────────────────────────────────────────────────────
 
 def _mut_add_noise(x: np.ndarray) -> np.ndarray:
     return x + np.random.randn(*x.shape).astype(np.float32) * 0.1
@@ -522,10 +435,6 @@ _MUTATIONS = {
 }
 _MUT_NAMES = list(_MUTATIONS.keys())
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Main loop
-# ─────────────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="SMOLFuzz TF (CPU vs GPU)")
@@ -571,19 +480,15 @@ def main() -> None:
     )
     bug_log: list[dict] = []
 
-    # Coverage tracking
     all_apis = set()
     for apis in selectable.values():
         all_apis.update(apis)
     apis_attempted: set[str] = set()
     apis_executed: set[str]  = set()
 
-    # Per-strategy adaptive counter (paper §3.2): initialised to 1 so all
-    # strategies are sampled equally before feedback arrives.
     strategy_counts: dict[str, int] = {n: 1 for n in _MUT_NAMES}
 
     def _pick_strategy() -> str:
-        """Roulette-wheel strategy selection proportional to anomaly counts."""
         total = sum(strategy_counts.values())
         r = random.random() * total
         for s in _MUT_NAMES:
@@ -592,7 +497,6 @@ def main() -> None:
                 return s
         return max(strategy_counts, key=strategy_counts.__getitem__)
 
-    # 10-consecutive-model early stopping (paper §3.2 termination criterion).
     MAX_NO_NEW_API_STREAK = 10
     consecutive_no_new_apis = 0
     coverage_history: list[tuple[int, int]] = []
@@ -605,15 +509,12 @@ def main() -> None:
         log.info("=" * 60)
         log.info("Model %d / %d", mid, args.models)
 
-        # 1. Select APIs (multi-roulette)
         apis = selector.select(n=args.api_set_size)
         apis_attempted.update(apis)
         log.info("Selected %d APIs", len(apis))
 
-        # 2. Baseline input (identical across devices; fixed seed ⇒ reproducible)
         x_base = rng.randn(4, 8).astype(np.float32)
 
-        # 3. Synthesize + repair
         src, used_apis, attempts = synthesize_tf_model(
             llm, apis, ws_dir, mid, x_base,
         )
@@ -630,8 +531,6 @@ def main() -> None:
             f"# USED_APIS = {used_apis}\n\n{src}\n"
         )
 
-        # 4. Baseline CPU vs GPU — if baseline fails, the LLM code is bad;
-        #    count as invalid_model, NEVER as a library bug.
         r_base = run_comparison(src, x_base, ws_dir, mid, timeout=90)
         if r_base.get("no_gpu"):
             log.error("No GPU available — aborting TF run")
@@ -650,9 +549,6 @@ def main() -> None:
             selector.record_usage(used_apis, triggered_bug=False)
             continue
 
-        # Baseline must itself be consistent on CPU vs GPU; otherwise the model
-        # is numerically unstable by construction and mutation-time divergence
-        # is not a library bug.
         base_type, base_detail = compare_outputs(
             r_base["cpu"], r_base["gpu"],
             gpu_repeat=r_base.get("gpu_repeat"),
@@ -672,8 +568,6 @@ def main() -> None:
         coverage_history.append((mid, len(apis_executed)))
         log.info("m%04d: baseline OK — fuzzing for %ds", mid, args.budget)
 
-        # 5. Mutation fuzzing — 60s budget (paper §3.2)
-        #    Feedback-driven strategy selection + sweep-based seed reset.
         found_bug = False
         mut_count = 0
         bstart = time.time()
@@ -732,11 +626,6 @@ def main() -> None:
                 found_bug = True
                 break
 
-            # Near-miss: NONDET-style anomaly (non-crash, non-bug divergence)
-            # counts as a sweep anomaly and boosts the strategy's counter.
-            # (paper §3.2: "anomaly or near-miss")
-
-            # Full sweep: if all strategies tried in this round, check for reset.
             if set(tried_in_sweep) >= set(_MUT_NAMES):
                 if not sweep_anomaly:
                     log.info("  m%04d: full sweep — no anomaly, re-sampling inputs", mid)
@@ -752,10 +641,8 @@ def main() -> None:
             log.info("m%04d: clean after %d mutations (%.1fs budget)",
                      mid, mut_count, time.time() - bstart)
 
-        # 6. Feedback → selector (paper §3.1.2: bug APIs exempt from score decay).
         selector.record_usage(used_apis, triggered_bug=found_bug)
 
-        # 7. Early stopping: 10 consecutive models with no new APIs (paper §3.2).
         new_apis = set(used_apis) - apis_executed
         if new_apis:
             consecutive_no_new_apis = 0
@@ -768,7 +655,6 @@ def main() -> None:
                 )
                 break
 
-    # ── Summary ────────────────────────────────────────────────────────────
     log.info("=" * 60)
     log.info(
         "DONE | models=%d failed_synth=%d invalid=%d no_gpu=%d "
@@ -778,7 +664,6 @@ def main() -> None:
     )
     log.info("Bug types: %s", stats["bug_types"])
 
-    # Coverage
     n_total = len(all_apis)
     n_att   = len(apis_attempted)
     n_exec  = len(apis_executed)

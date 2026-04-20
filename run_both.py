@@ -1,15 +1,3 @@
-"""
-SMOLFuzz — Launch PyTorch (CPU vs CUDA) and TensorFlow (CPU vs GPU)
-campaigns in parallel.
-
-Usage:
-    python3 run_both.py [--models 500] [--budget 60]
-
-Output:
-    results/run_500_pytorch/   — PyTorch bug reports and summary
-    results/run_500_tf/        — TensorFlow bug reports and summary
-    results/run_500_combined_summary.txt
-"""
 from __future__ import annotations
 
 import argparse
@@ -27,12 +15,11 @@ logging.basicConfig(
 )
 log = logging.getLogger("run_both")
 
-HERE    = Path(__file__).parent          # smolfuzz/
-PARENT  = HERE.parent                   # project root (needed for -m smolfuzz.main)
+HERE    = Path(__file__).parent
+PARENT  = HERE.parent
 
 
 def _tail_summary(summary_file: Path, max_lines: int = 40) -> str:
-    """Return the last max_lines of a summary file, or a placeholder."""
     if not summary_file.exists():
         return "  (summary not found)"
     lines = summary_file.read_text().splitlines()
@@ -66,7 +53,6 @@ def main() -> None:
     log.info("TF      output → %s", tf_outdir)
     log.info("=" * 70)
 
-    # ── Build subprocess commands ──────────────────────────────────────────
     pt_cmd = [
         sys.executable, "-m", "smolfuzz.main",
         "--mode",         "full",
@@ -84,7 +70,6 @@ def main() -> None:
         "--out",          str(tf_outdir),
     ]
 
-    # ── Launch both in parallel ────────────────────────────────────────────
     log.info("Launching PyTorch fuzzer…")
     out_base.mkdir(parents=True, exist_ok=True)
     pt_log_path = out_base / f"run_{args.models}_pytorch.log"
@@ -92,11 +77,10 @@ def main() -> None:
     pt_proc = subprocess.Popen(
         pt_cmd,
         stdout=open(pt_log_path, "w"), stderr=subprocess.STDOUT,
-        cwd=str(PARENT),   # python3 -m smolfuzz.main must run from project root
+        cwd=str(PARENT),
     )
     log.info("PyTorch PID %d  log → %s", pt_proc.pid, pt_log_path)
 
-    # Small stagger so both don't hammer LLM simultaneously on the first request
     time.sleep(5)
 
     log.info("Launching TensorFlow fuzzer…")
@@ -104,13 +88,12 @@ def main() -> None:
     tf_proc = subprocess.Popen(
         tf_cmd,
         stdout=open(tf_log_path, "w"), stderr=subprocess.STDOUT,
-        cwd=str(PARENT),   # -m smolfuzz.run_tf must run from project root
+        cwd=str(PARENT),
     )
     log.info("TF      PID %d  log → %s", tf_proc.pid, tf_log_path)
 
-    # ── Monitor and wait ───────────────────────────────────────────────────
     start = time.time()
-    poll_interval = 60  # seconds between status checks
+    poll_interval = 60
 
     while True:
         pt_done = pt_proc.poll() is not None
@@ -129,7 +112,6 @@ def main() -> None:
 
         time.sleep(poll_interval)
 
-    # ── Collect results ────────────────────────────────────────────────────
     pt_rc = pt_proc.returncode
     tf_rc = tf_proc.returncode
     total_time = time.time() - start
@@ -139,8 +121,6 @@ def main() -> None:
     log.info("PyTorch exit code: %d", pt_rc)
     log.info("TF      exit code: %d", tf_rc)
 
-    # ── Combined summary ───────────────────────────────────────────────────
-    # PyTorch main.py does not write a summary.txt — use the tail of its log
     tf_summary_file = tf_outdir / "summary.txt"
 
     def _log_tail(log_path: Path, max_lines: int = 30) -> str:

@@ -1,18 +1,3 @@
-"""
-SMOLFuzz – Synthesizing Models with LLMs for Fuzzing Deep Learning Libraries.
-PyTorch implementation. Stops via the paper's criterion: 10 consecutive models
-that introduce no previously unseen API.
-
-Usage:
-  # Subset validation (5 models, fast):
-  python3 -m smolfuzz.main --mode subset
-
-  # Full run (stops via early-stopping criterion):
-  python3 -m smolfuzz.main --mode full --budget 60
-
-  # Custom LLM models:
-  python3 -m smolfuzz.main --mode full --llm-models "qwen2.5-coder:32b,deepseek-coder-v2:16b"
-"""
 from __future__ import annotations
 
 import argparse
@@ -22,7 +7,6 @@ import sys
 import time
 from pathlib import Path
 
-# Allow running as `python3 main.py` from the smolfuzz dir
 if __name__ == "__main__" and __package__ is None:
     sys.path.insert(0, str(Path(__file__).parent.parent))
     __package__ = "smolfuzz"
@@ -49,10 +33,6 @@ _MUTATION_NAMES = {1: "add_noise", 2: "scale_small", 3: "mask",
                    4: "uniform",   5: "scale_large"}
 
 
-# ------------------------------------------------------------------ #
-# Main fuzzing loop                                                   #
-# ------------------------------------------------------------------ #
-
 def run(
     api_file: Path,
     output_dir: Path,
@@ -61,7 +41,6 @@ def run(
     fuzzing_budget_s: int,
     llm_models: list[str] | None = None,
 ) -> None:
-    # ---------- Setup ----------
     output_dir.mkdir(parents=True, exist_ok=True)
     models_dir = output_dir / "models"
     models_dir.mkdir(exist_ok=True)
@@ -70,8 +49,6 @@ def run(
     groups = load_and_classify(api_file)
     logger.info("API classification:\n%s", group_summary(groups))
 
-    # Critical: strip the "_excluded" bucket so the selector never samples
-    # random / compiler / infrastructure APIs.
     selectable_groups = {k: v for k, v in groups.items() if k != "_excluded"}
     selector    = MultiRouletteSelector(selectable_groups)
     client      = OllamaClient(models=llm_models) if llm_models else OllamaClient()
@@ -88,23 +65,19 @@ def run(
     total_nondet   = 0
     total_gen_fail = 0
     failed_synth   = 0
-    invalid_models = 0   # baseline crashed on either device → bad model code
-    rejected_random = 0  # model contains randomness → skipped to avoid FPs
+    invalid_models = 0
+    rejected_random = 0
 
-    # API coverage tracking — only count the selectable pool as denominator.
     all_apis_union: set[str] = set()
     for g_name, apis in selectable_groups.items():
         all_apis_union.update(apis)
-    apis_attempted: set[str] = set()   # selected by selector
-    apis_executed:  set[str] = set()   # ran successfully on both devices
-    coverage_history: list[tuple[int, int]] = []   # (model_idx, #executed)
+    apis_attempted: set[str] = set()
+    apis_executed:  set[str] = set()
+    coverage_history: list[tuple[int, int]] = []
 
-    # Per-strategy adaptive counter (paper §3.2): initialised to 1 so all
-    # strategies are sampled in early sweeps before feedback arrives.
     strategy_counts: dict[int, int] = {1: 1, 2: 1, 3: 1, 4: 1, 5: 1}
 
     def _pick_strategy() -> int:
-        """Roulette-wheel strategy selection proportional to anomaly counts."""
         total = sum(strategy_counts.values())
         r = random.random() * total
         for s in sorted(strategy_counts):
@@ -113,24 +86,19 @@ def run(
                 return s
         return max(strategy_counts, key=strategy_counts.__getitem__)
 
-    # 10-consecutive-model early stopping (paper §3.2 termination criterion).
     MAX_NO_NEW_API_STREAK = 10
     consecutive_no_new_apis = 0
 
-    # ---------- Main loop ----------
     for i in range(n_models):
         logger.info("=" * 60)
         logger.info("Model %d / %d", i + 1, n_models)
 
-        # 1. Select APIs
         api_set = selector.select(n=api_set_size)
         apis_attempted.update(api_set)
         logger.info("Selected %d APIs", len(api_set))
 
-        # 2. Synthesize model
         synth = synthesizer.synthesize(api_set)
 
-        # Save every model (success or fail) for reference
         model_path = models_dir / f"model_{synth.model_id:04d}.py"
         model_path.write_text(
             f"# SMOLFuzz model {synth.model_id} | llm={synth.llm_model}"
@@ -147,8 +115,6 @@ def run(
             selector.record_usage(synth.used_apis, triggered_bug=False)
             continue
 
-        # Static reject: LLM-inserted randomness makes CPU/GPU RNG streams
-        # diverge and would false-positive every diff comparison.
         if has_randomness(synth.code):
             logger.warning(
                 "Model %d rejected: LLM inserted random op (dropout/rand/bernoulli)"
@@ -170,7 +136,6 @@ def run(
         logger.info("Synthesis OK | llm=%s | attempts=%d | used_apis=%d",
                     synth.llm_model, synth.attempts, len(synth.used_apis))
 
-        # 3. Baseline validation — both CPU and GPU must succeed
         logger.info("Validating baseline (CPU + GPU)…")
         pair, inputs = executor.run_baseline(synth.code, synth.model_id)
 
@@ -178,7 +143,6 @@ def run(
         gpu_ok = pair.gpu.status == "ok"
 
         if not cpu_ok or not gpu_ok:
-            # Either device crashed/errored on original inputs → model is invalid
             logger.warning(
                 "Model %d invalid: cpu=%s gpu=%s — skipping",
                 synth.model_id, pair.cpu.status, pair.gpu.status,
@@ -197,17 +161,12 @@ def run(
             selector.record_usage(synth.used_apis, triggered_bug=False)
             continue
 
-        # Track execution coverage: APIs that successfully ran on BOTH devices
         apis_executed.update(synth.used_apis)
         coverage_history.append((i + 1, len(apis_executed)))
 
         logger.info("Baseline OK — model is valid, starting fuzzing for %ds…",
                     fuzzing_budget_s)
 
-        # 4. Fuzz for fuzzing_budget_s seconds; collect ALL bugs found.
-        #    Strategy sweep+reset (paper §3.2): after all 5 strategies have been
-        #    tried in a round with no anomaly/near-miss, re-sample fresh inputs
-        #    by re-running the baseline so the fuzzer escapes local minima.
         found_bug = False
         mutation_count = 0
         budget_start = time.time()
@@ -234,9 +193,9 @@ def run(
                 strategy_counts[strategy] += 1
                 total_bugs += 1
                 found_bug = True
-                break  # bug recorded — stop fuzzing this model
+                break
             elif mreport.is_nondet():
-                strategy_counts[strategy] += 1  # near-miss still improves score
+                strategy_counts[strategy] += 1
                 sweep_anomaly = True
                 total_nondet += 1
                 logger.info("  Non-deterministic (not counted as bug)")
@@ -247,7 +206,6 @@ def run(
                 logger.info("  Clean (no bug)")
                 total_clean += 1
 
-            # Full sweep complete: if no anomaly found, re-sample inputs.
             if len(tried_in_sweep) == 5:
                 if not sweep_anomaly:
                     logger.info(
@@ -271,11 +229,8 @@ def run(
             logger.info("Model %d: no bug found after %d mutations (%.1fs budget)",
                         synth.model_id, mutation_count, elapsed_total)
 
-        # 5. Feedback to selector
         selector.record_usage(synth.used_apis, triggered_bug=found_bug)
 
-        # 6. Early stopping: 10 consecutive models with no previously unseen API
-        #    (paper §3.2 termination criterion).
         new_apis = set(synth.used_apis) - apis_executed
         if new_apis:
             consecutive_no_new_apis = 0
@@ -288,7 +243,6 @@ def run(
                 )
                 break
 
-    # ---------- Summary ----------
     logger.info("=" * 60)
     logger.info(
         "DONE | models=%d failed_synth=%d invalid=%d rejected_random=%d "
@@ -297,7 +251,6 @@ def run(
         total_bugs, total_clean, total_nondet, total_gen_fail,
     )
 
-    # ---------- Coverage ----------
     n_total = len(all_apis_union)
     n_att = len(apis_attempted)
     n_exec = len(apis_executed)
@@ -309,7 +262,6 @@ def run(
     logger.info("  APIs executed   (both devices): %d  (%.1f%%)",
                 n_exec, 100.0 * n_exec / max(1, n_total))
 
-    # Per-group coverage breakdown
     logger.info("  Per-group executed:")
     for gname, apis in selectable_groups.items():
         total = len(apis)
@@ -319,7 +271,6 @@ def run(
         logger.info("    %-22s : %3d / %3d  (%.1f%%)",
                     gname, exec_n, total, 100.0 * exec_n / total)
 
-    # Persist coverage artefacts so the run is auditable
     import json as _json
     coverage_data = {
         "n_models": n_models,
@@ -349,10 +300,6 @@ def run(
     logger.info("Selector stats: %s", selector.stats())
     logger.info("Bug reports → %s", output_dir / "bugs")
 
-
-# ------------------------------------------------------------------ #
-# CLI                                                                 #
-# ------------------------------------------------------------------ #
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="SMOLFuzz: LLM-based DL library fuzzer")
