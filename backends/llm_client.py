@@ -62,7 +62,7 @@ OLLAMA_URL = "http://localhost:11434"
 
 _DEFAULT_OLLAMA_MODELS = [
     "qwen2.5-coder:32b",
-    "deepseek-coder-v2:16b",
+    "deepseek-v2",
 ]
 
 

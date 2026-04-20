@@ -294,12 +294,17 @@ class MultiRouletteSelector:
         return selected
 
     def record_usage(self, apis: List[str], triggered_bug: bool = False) -> None:
-        """Update usage counts after a model run."""
+        """Update usage counts after a model run.
+
+        Paper §3.1.2: when an API participates in a model that triggers an
+        oracle-detected anomaly, u_ij is NOT incremented so the score stays
+        high and the API keeps being sampled.
+        """
         for api in apis:
+            if triggered_bug:
+                self._bug_apis.add(api)   # mark first — exempts from increment
             if api not in self._bug_apis:
                 self._usage[api] += 1
-            if triggered_bug:
-                self._bug_apis.add(api)
 
     def stats(self) -> Dict[str, int]:
         return {

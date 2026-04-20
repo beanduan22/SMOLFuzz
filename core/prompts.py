@@ -258,25 +258,30 @@ USED_APIS = ["tf.keras.layers.BatchNormalization",
 '''
 
 _TF_EXAMPLE_CTX = '''
-# Example – Concurrency / device-scope dependency
+# Example – Concurrency / strategy-scope dependency
 import tensorflow as tf
+
+# Variables created inside strategy.scope() are distributed; ops outside
+# the scope run on the default device.  This alters variable placement and
+# collective synchronization semantics (paper §1 dependency type iii).
+strategy = tf.distribute.OneDeviceStrategy(device="/gpu:0")
 
 class Model(tf.keras.Model):
     def __init__(self):
         super().__init__()
-        self.d = tf.keras.layers.Dense(8)
+        with strategy.scope():
+            self.d1 = tf.keras.layers.Dense(8)
+            self.d2 = tf.keras.layers.Dense(4)
 
     def call(self, x, training=False):
-        # Pinning an op to a specific device within call() introduces a
-        # context-managed dependency: the downstream op inherits the scope.
-        with tf.device('/CPU:0'):
-            a = self.d(x)
-            b = tf.math.sigmoid(a)
-        c = tf.tanh(b) + tf.math.softplus(b)
+        with strategy.scope():
+            a = self.d1(x)
+            b = tf.nn.relu(a)
+        c = self.d2(b)
         return c
 
-USED_APIS = ["tf.keras.layers.Dense", "tf.math.sigmoid", "tf.tanh",
-             "tf.math.softplus", "tf.device"]
+USED_APIS = ["tf.distribute.OneDeviceStrategy", "tf.keras.layers.Dense",
+             "tf.nn.relu"]
 '''
 
 TF_FEW_SHOT_EXAMPLES = "\n".join(

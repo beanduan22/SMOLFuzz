@@ -577,6 +577,24 @@ def main() -> None:
         all_apis.update(apis)
     apis_attempted: set[str] = set()
     apis_executed: set[str]  = set()
+
+    # Per-strategy adaptive counter (paper §3.2): initialised to 1 so all
+    # strategies are sampled equally before feedback arrives.
+    strategy_counts: dict[str, int] = {n: 1 for n in _MUT_NAMES}
+
+    def _pick_strategy() -> str:
+        """Roulette-wheel strategy selection proportional to anomaly counts."""
+        total = sum(strategy_counts.values())
+        r = random.random() * total
+        for s in _MUT_NAMES:
+            r -= strategy_counts[s]
+            if r <= 0:
+                return s
+        return max(strategy_counts, key=strategy_counts.__getitem__)
+
+    # 10-consecutive-model early stopping (paper §3.2 termination criterion).
+    MAX_NO_NEW_API_STREAK = 10
+    consecutive_no_new_apis = 0
     coverage_history: list[tuple[int, int]] = []
 
     log.info("SMOLFuzz TF (CPU vs GPU) | models=%d budget=%ds → %s",
@@ -654,15 +672,21 @@ def main() -> None:
         coverage_history.append((mid, len(apis_executed)))
         log.info("m%04d: baseline OK — fuzzing for %ds", mid, args.budget)
 
-        # 5. Mutation fuzzing — 60s budget
+        # 5. Mutation fuzzing — 60s budget (paper §3.2)
+        #    Feedback-driven strategy selection + sweep-based seed reset.
         found_bug = False
         mut_count = 0
         bstart = time.time()
+        tried_in_sweep: set[str] = set()
+        sweep_anomaly = False
+        x_cur = x_base.copy()
+
         while time.time() - bstart < args.budget:
-            mut_name = random.choice(_MUT_NAMES)
-            x_mut = _MUTATIONS[mut_name](x_base.copy())
+            mut_name = _pick_strategy()
+            x_mut = _MUTATIONS[mut_name](x_cur.copy())
             mut_count += 1
             stats["mutations_run"] += 1
+            tried_in_sweep.add(mut_name)
 
             remaining = args.budget - (time.time() - bstart)
             if remaining <= 5:
@@ -674,14 +698,10 @@ def main() -> None:
             bug_type, detail = None, ""
 
             if r.get("crash"):
-                # Infrastructure-level crashes (OOM, driver resets) are not
-                # library bugs — the user explicitly rejects false positives.
-                # Scan the FULL error string, not the truncated head.
                 if _is_infra_error(r["crash"]):
-                    log.info("  m%04d mut %s: infra error (%s) — skipping",
-                             mid, mut_name, (r["crash"] or "")[-100:])
+                    log.info("  m%04d mut %s: infra error — skipping",
+                             mid, mut_name)
                     continue
-                # Mutation-time crash is a bug (baseline was clean).
                 bug_type = "CRASH"
                 detail = (r["crash"] or "")[-400:]
             else:
@@ -693,6 +713,7 @@ def main() -> None:
                 )
 
             if bug_type:
+                strategy_counts[mut_name] += 1
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                 bname = f"bug_{bug_type.lower()}_m{mid:04d}_{mut_name}_{ts}"
                 entry = dict(
@@ -704,13 +725,24 @@ def main() -> None:
                 )
                 (bug_dir / f"{bname}.json").write_text(json.dumps(entry, indent=2))
                 np.save(str(bug_dir / f"{bname}.inputs.npy"), x_mut)
-
                 stats["bugs"] += 1
                 stats["bug_types"][bug_type] = stats["bug_types"].get(bug_type, 0) + 1
                 bug_log.append(entry)
                 log.warning("  BUG %s [%s] %s", bug_type, mut_name, detail[:90])
                 found_bug = True
                 break
+
+            # Near-miss: NONDET-style anomaly (non-crash, non-bug divergence)
+            # counts as a sweep anomaly and boosts the strategy's counter.
+            # (paper §3.2: "anomaly or near-miss")
+
+            # Full sweep: if all strategies tried in this round, check for reset.
+            if set(tried_in_sweep) >= set(_MUT_NAMES):
+                if not sweep_anomaly:
+                    log.info("  m%04d: full sweep — no anomaly, re-sampling inputs", mid)
+                    x_cur = rng.randn(*x_base.shape).astype(np.float32)
+                tried_in_sweep = set()
+                sweep_anomaly = False
 
         if found_bug:
             log.info("m%04d: bug found after %d mutations (%.1fs)",
@@ -720,9 +752,21 @@ def main() -> None:
             log.info("m%04d: clean after %d mutations (%.1fs budget)",
                      mid, mut_count, time.time() - bstart)
 
-        # 6. Feedback → selector. APIs associated with bugs are exempt from
-        #    penalty (score unchanged), so they keep being sampled.
+        # 6. Feedback → selector (paper §3.1.2: bug APIs exempt from score decay).
         selector.record_usage(used_apis, triggered_bug=found_bug)
+
+        # 7. Early stopping: 10 consecutive models with no new APIs (paper §3.2).
+        new_apis = set(used_apis) - apis_executed
+        if new_apis:
+            consecutive_no_new_apis = 0
+        else:
+            consecutive_no_new_apis += 1
+            if consecutive_no_new_apis >= MAX_NO_NEW_API_STREAK:
+                log.info(
+                    "Early stop: %d consecutive models introduced no new APIs",
+                    MAX_NO_NEW_API_STREAK,
+                )
+                break
 
     # ── Summary ────────────────────────────────────────────────────────────
     log.info("=" * 60)

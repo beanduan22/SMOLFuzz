@@ -19,7 +19,7 @@ Install Ollama and pull both required models:
 ```bash
 curl -fsSL https://ollama.ai/install.sh | sh
 ollama pull qwen2.5-coder:32b
-ollama pull deepseek-coder-v2:16b
+ollama pull deepseek-v2
 ollama serve
 ```
 
@@ -75,21 +75,21 @@ Qwen and DeepSeek are both required; the fuzzer round-robins between them.
 ```bash
 ollama serve
 ollama pull qwen2.5-coder:32b
-ollama pull deepseek-coder-v2:16b
+ollama pull deepseek-v2
 ```
 
 ```python
 from smolfuzz.backends.llm_client import OllamaClient
 from smolfuzz.core.synthesizer import ModelSynthesizer
 
-client = OllamaClient(models=["qwen2.5-coder:32b", "deepseek-coder-v2:16b"])
+client = OllamaClient(models=["qwen2.5-coder:32b", "deepseek-v2"])
 synthesizer = ModelSynthesizer(client)
 ```
 
 Via CLI:
 
 ```bash
-python3 -m smolfuzz.main --mode full --llm-models "qwen2.5-coder:32b,deepseek-coder-v2:16b"
+python3 -m smolfuzz.main --mode full --llm-models "qwen2.5-coder:32b,deepseek-v2"
 ```
 
 ### OpenAI (GPT-4 Turbo)
