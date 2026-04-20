@@ -230,10 +230,12 @@ class MultiRouletteSelector:
                 return False
             return True
 
+        # random_generation and _excluded are not selectable (paper §3.1.1).
+        _SKIP_GROUPS = {"random_generation", "_excluded"}
         self._groups = {
             g: [a for a in apis if _keep(a)]
             for g, apis in groups.items()
-            if any(_keep(a) for a in apis)
+            if g not in _SKIP_GROUPS and any(_keep(a) for a in apis)
         }
         self._usage: Dict[str, int] = defaultdict(int)   # api → usage count
         self._bug_apis: Set[str] = set()                  # exempt from penalisation

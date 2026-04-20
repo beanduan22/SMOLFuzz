@@ -2,21 +2,21 @@
 Load and classify PyTorch / TensorFlow APIs from the text files into the 11
 functional groups defined in the SMOLFuzz paper.
 
-Groups (from paper):
-  1.  creation_conversion   - tensor creation and dtype/device conversion       PT=127  TF=38
-  2.  mathematics           - arithmetic, linear algebra, trigonometry           PT=577  TF=306
-  3.  reshaping             - reshape, view, slice, transpose, concat            PT=115  TF=44
+Groups (from paper Table 1, with actual counts from torch_valid_apis.txt / tf_valid_apis.txt):
+  1.  creation_conversion   - tensor creation and dtype/device conversion       PT=125  TF=38
+  2.  mathematics           - arithmetic, linear algebra, trigonometry           PT=583  TF=306
+  3.  reshaping             - reshape, view, slice, transpose, concat            PT=117  TF=44
   4.  logical               - comparison, boolean, conditional                   PT=86   TF=18
-  5.  distributions         - probability distributions (parametric families)    PT=13  TF=19
-  6.  forward_layers        - nn layers (Conv, Linear, BN, RNN, Attention …)    PT=278  TF=566
-  7.  gradients_optim       - autograd, optimizers, gradient utilities           PT=28   TF=44
-  8.  storage_serial        - save/load, serialization                           PT=11   TF=3
-  9.  random_generation     - seeded random tensor generation (EXCLUDED)         PT=23   TF=37
-  10. model_io              - hub, checkpoint, scripting helpers                 PT=16   TF=125
-  11. misc                  - everything else                                    PT=55   TF=1025
+  5.  distributions         - probability distributions (parametric families)    PT=15   TF=19
+  6.  forward_layers        - nn layers (Conv, Linear, BN, RNN, Attention …)    PT=288  TF=566
+  7.  gradients_optim       - optimizers and lr schedulers                       PT=28   TF=44
+  8.  storage_serial        - save/load, storage classes                         PT=11   TF=3
+  9.  random_generation     - random tensor generation (NOT selectable)          PT=23   TF=37
+  10. model_io              - hub utilities                                      PT=7    TF=125
+  11. misc                  - everything else                                    PT=20   TF=1025
 
-  Selectable pool (random_generation excluded): PyTorch=1226, TensorFlow=1135
-  See docs/api_classification.md for full definitions and rationale.
+  Paper target counts: PT total=1329, TF total=2235.
+  Minor discrepancies from paper reflect different API-extraction methods.
 
 Exclusion policy (applied before classification, per paper §3.1.1):
 
@@ -61,9 +61,6 @@ _RANDOM_OP_REGEX = re.compile(
     r"|torch\.(rand_like|randn_like|randint_like)$"
     r"|torch\.random\."
     r"|torch\.manual_seed$"
-    r"|torch\.initial_seed$"
-    r"|torch\.set_rng_state$"
-    r"|torch\.get_rng_state$"
     r"|torch\.Tensor\.(random_|bernoulli_?|normal_|uniform_|cauchy_|exponential_|geometric_|log_normal_|multinomial)$"
     r"|tf\.random\."
     r"|tf\.compat\.v1\.random\."
@@ -121,11 +118,13 @@ _INFRA_REGEX = re.compile(
     r"|torch\.profiler($|\.)"
     r"|torch\.futures($|\.)"
     r"|torch\.overrides($|\.)"
-    r"|torch\.hub($|\.)"
     r"|torch\.multiprocessing($|\.)"
     r"|torch\.compiled_with_cxx11_abi$"
     r"|torch\.are_deterministic_algorithms_enabled$"
     r"|torch\.use_deterministic_algorithms$"
+    r"|torch\.initial_seed$"
+    r"|torch\.get_rng_state$"
+    r"|torch\.set_rng_state$"
     r"|torch\.set_default_"
     r"|torch\.get_default_"
     r"|torch\.set_num_"
@@ -187,22 +186,16 @@ def is_excluded(api: str) -> Tuple[bool, str]:
 
 _RULES: Dict[str, List[str]] = {
     "gradients_optim": [
-        "torch.optim.", "torch.autograd.", "torch.enable_grad",
-        "torch.no_grad", "torch.is_grad_enabled", "torch.set_grad_enabled",
-        "torch.gradient", "torch.Tensor.grad", "torch.Tensor.backward",
-        "torch.Tensor.requires_grad", "torch.Tensor.retain_grad",
-        "torch.Tensor.register_hook", "torch.nn.utils.clip_grad",
+        "torch.optim.",
     ],
     "distributions": [
         "torch.distributions.",
     ],
     "storage_serial": [
-        "torch.save", "torch.load", "torch.jit.", "torch.package.",
-        "torch.serialization", "torch.onnx", "torch.export",
+        "torch.save", "torch.load",
     ],
     "model_io": [
-        "torch.hub.", "torch.fx.", "torch.profiler.", "torch.futures.",
-        "torch.overrides.",
+        "torch.hub.",
     ],
     "random_generation": [
         # NB: most of these never appear in practice because is_excluded()
@@ -577,10 +570,7 @@ _TENSOR_LOGICAL_SUFFIXES = {
     "masked_select",
 }
 
-_TENSOR_GRAD_SUFFIXES = {
-    "backward", "grad", "grad_fn", "register_hook",
-    "retain_grad", "requires_grad", "retains_grad",
-}
+_TENSOR_GRAD_SUFFIXES: set = set()  # Tensor gradient methods fall to misc (paper §3.1.1)
 
 
 def _classify_tensor_method(api: str) -> str:
@@ -633,7 +623,14 @@ def _classify_api(api: str) -> str:
     # Fallback: torch.Tensor.* method name matching
     if api.startswith("torch.Tensor."):
         return _classify_tensor_method(api)
-    # Storage types → creation/conversion
+    # Standard storage classes → storage/serialisation group.
+    # Quantised (QInt*, QUInt*), complex, and bfloat16 variants stay in
+    # creation_conversion because they are dtype/conversion objects, not
+    # serialisation primitives.
+    if api.endswith("Storage") and not any(
+        q in api for q in ("QInt", "QUInt", "Complex", "BFloat")
+    ):
+        return "storage_serial"
     if api.endswith("Storage"):
         return "creation_conversion"
     return _MISC
@@ -837,11 +834,24 @@ def load_and_classify(
     apis = [line.strip() for line in path.read_text().splitlines() if line.strip()]
 
     groups: Dict[str, List[str]] = {g: [] for g in _GROUP_ORDER}
+    groups["random_generation"] = []
     groups["_excluded"] = []
     for api in apis:
-        excluded, _reason = is_excluded(api)
-        if excluded and drop_excluded:
-            groups["_excluded"].append(api)
+        excluded, reason = is_excluded(api)
+        if excluded:
+            if reason == "random_generation":
+                # Some APIs caught by the random regex are parametric distributions
+                # (e.g. tf.random.categorical, tf.random.gamma).  Let the group
+                # rules override: if _classify() returns "distributions" the API
+                # goes into the selectable pool; otherwise it stays in random_generation
+                # (excluded from selection per paper §3.1.1).
+                group = _classify(api, framework)
+                if group == "distributions":
+                    groups["distributions"].append(api)
+                else:
+                    groups["random_generation"].append(api)
+            elif drop_excluded:
+                groups["_excluded"].append(api)
             continue
         groups[_classify(api, framework)].append(api)
 
