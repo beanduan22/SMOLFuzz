@@ -42,18 +42,25 @@ See [docs/llm_backends.md](docs/llm_backends.md) to use OpenAI, Anthropic, or an
 
 ```
 smolfuzz/
-├── main.py            # PyTorch fuzzing entry point
-├── run_tf.py          # TensorFlow fuzzing entry point
-├── run_both.py        # Run PT + TF in parallel
-├── api_loader.py      # API loader + 11-group classifier
-├── selector.py        # Multi-roulette API selector
-├── synthesizer.py     # LLM model synthesis + self-repair loop
-├── executor.py        # Subprocess executor + 5 mutation strategies
-├── oracle.py          # Differential oracle (CPU vs GPU)
-├── llm_client.py      # LLM backend (Ollama / OpenAI / Anthropic)
-├── prompts.py         # LLM prompt templates
+├── main.py              # PyTorch fuzzing entry point
+├── run_tf.py            # TensorFlow fuzzing entry point
+├── run_both.py          # Run PT + TF in parallel
 ├── torch_valid_apis.txt
 ├── tf_valid_apis.txt
+├── core/
+│   ├── api_loader.py    # API loader + 11-group classifier
+│   ├── selector.py      # Multi-roulette API selector
+│   ├── synthesizer.py   # LLM model synthesis + self-repair loop
+│   ├── executor.py      # Subprocess executor + 5 mutation strategies
+│   ├── oracle.py        # Differential oracle (CPU vs GPU)
+│   └── prompts.py       # LLM prompt templates
+├── backends/
+│   └── llm_client.py    # LLM backends (Ollama / OpenAI / Anthropic)
+├── examples/
+│   ├── ollama_example.py
+│   ├── openai_example.py
+│   ├── anthropic_example.py
+│   └── custom_backend_example.py
 └── docs/
     ├── setup.md
     ├── usage.md

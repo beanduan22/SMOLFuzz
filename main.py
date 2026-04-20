@@ -26,12 +26,12 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.insert(0, str(Path(__file__).parent.parent))
     __package__ = "smolfuzz"
 
-from .api_loader import group_summary, load_and_classify
-from .executor import ModelExecutor, has_randomness, has_nondet_gpu_op
-from .llm_client import OllamaClient
-from .oracle import DifferentialOracle
-from .selector import MultiRouletteSelector
-from .synthesizer import ModelSynthesizer
+from .core.api_loader import group_summary, load_and_classify
+from .core.executor import ModelExecutor, has_randomness, has_nondet_gpu_op
+from .backends.llm_client import OllamaClient
+from .core.oracle import DifferentialOracle
+from .core.selector import MultiRouletteSelector
+from .core.synthesizer import ModelSynthesizer
 
 logging.basicConfig(
     level=logging.INFO,

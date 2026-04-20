@@ -14,8 +14,8 @@ ollama pull qwen2.5-coder:32b   # or any code-capable model
 ```
 
 ```python
-from smolfuzz.llm_client import OllamaClient
-from smolfuzz.synthesizer import ModelSynthesizer
+from smolfuzz.backends.llm_client import OllamaClient
+from smolfuzz.core.synthesizer import ModelSynthesizer
 
 client = OllamaClient(models=["qwen2.5-coder:32b"])
 synthesizer = ModelSynthesizer(client)
@@ -38,8 +38,8 @@ export OPENAI_API_KEY=sk-...
 ```
 
 ```python
-from smolfuzz.llm_client import OpenAIClient
-from smolfuzz.synthesizer import ModelSynthesizer
+from smolfuzz.backends.llm_client import OpenAIClient
+from smolfuzz.core.synthesizer import ModelSynthesizer
 
 client = OpenAIClient(model="gpt-4o")
 synthesizer = ModelSynthesizer(client)
@@ -55,8 +55,8 @@ export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ```python
-from smolfuzz.llm_client import AnthropicClient
-from smolfuzz.synthesizer import ModelSynthesizer
+from smolfuzz.backends.llm_client import AnthropicClient
+from smolfuzz.core.synthesizer import ModelSynthesizer
 
 client = AnthropicClient(model="claude-sonnet-4-6")
 synthesizer = ModelSynthesizer(client)
@@ -67,7 +67,7 @@ synthesizer = ModelSynthesizer(client)
 Implement the `LLMBackend` protocol — three members are required:
 
 ```python
-from smolfuzz.llm_client import LLMBackend
+from smolfuzz.backends.llm_client import LLMBackend
 
 class MyClient:
     @property
@@ -85,7 +85,7 @@ class MyClient:
 Pass it directly to `ModelSynthesizer`:
 
 ```python
-from smolfuzz.synthesizer import ModelSynthesizer
+from smolfuzz.core.synthesizer import ModelSynthesizer
 
 synthesizer = ModelSynthesizer(MyClient())
 ```
@@ -99,6 +99,8 @@ client = OllamaClient(models=llm_models) if llm_models else OllamaClient()
 # With your client:
 client = MyClient()
 ```
+
+See `examples/custom_backend_example.py` for a complete runnable template.
 
 ## Configuration Reference
 
