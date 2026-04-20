@@ -316,7 +316,7 @@ TF_SYNTHESIS_TEMPLATE = """You are an expert TensorFlow 2.x developer. Write ONE
 4. Include at least ONE of these API dependency contexts:
    - `tf.GradientTape()` scope around ops (computational-graph dependency)
    - training vs inference switch via the `training` kwarg (mode dependency)
-   - `tf.device(...)` scope around ops (concurrency/device dependency)
+   - `tf.distribute.Strategy.scope()` around layer creation and calls (concurrency dependency)
 5. Define `USED_APIS = [...]` listing the APIs from the candidate set that
    are actually used.
 6. Do NOT import anything — `import tensorflow as tf` is already available.
