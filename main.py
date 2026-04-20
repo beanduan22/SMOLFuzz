@@ -1,16 +1,17 @@
 """
 SMOLFuzz – Synthesizing Models with LLMs for Fuzzing Deep Learning Libraries.
-PyTorch implementation using local Ollama models (qwen2.5-coder:32b, llama3.3:70b).
+PyTorch implementation. Stops via the paper's criterion: 10 consecutive models
+that introduce no previously unseen API.
 
 Usage:
   # Subset validation (5 models, fast):
   python3 -m smolfuzz.main --mode subset
 
-  # Full run:
-  python3 -m smolfuzz.main --mode full --models 300
+  # Full run (stops via early-stopping criterion):
+  python3 -m smolfuzz.main --mode full --budget 60
 
-  # Custom:
-  python3 -m smolfuzz.main --mode full --models 300 --api-set-size 20 --budget 60
+  # Custom LLM models:
+  python3 -m smolfuzz.main --mode full --llm-models "qwen2.5-coder:32b,deepseek-coder-v2:16b"
 """
 from __future__ import annotations
 

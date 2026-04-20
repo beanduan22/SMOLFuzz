@@ -8,15 +8,31 @@ SMOLFuzz is a differential fuzzer that uses an LLM to synthesize PyTorch and Ten
 
 ## Setup
 
-See [docs/setup.md](docs/setup.md) for full requirements and GPU verification steps.
+**Requirements:** Python ≥ 3.10, PyTorch ≥ 2.1 with CUDA, TensorFlow ≥ 2.13 with GPU, NVIDIA GPU with CUDA ≥ 11.8.
 
 ```bash
 pip install -r requirements.txt
+```
 
-# Pull the default local model (~20 GB VRAM)
+Install Ollama and pull both required models:
+
+```bash
+curl -fsSL https://ollama.ai/install.sh | sh
 ollama pull qwen2.5-coder:32b
+ollama pull deepseek-coder-v2:16b
+ollama serve
+```
 
-# Validate the installation (5 models)
+Verify GPU access:
+
+```bash
+python3 -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+python3 -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
+```
+
+Validate the installation:
+
+```bash
 python3 -m smolfuzz.main --mode subset
 ```
 
@@ -24,18 +40,27 @@ python3 -m smolfuzz.main --mode subset
 
 ## Reproduce Experiments
 
-See [docs/usage.md](docs/usage.md) for all CLI flags and output layout.
+The fuzzer runs until the paper's stopping criterion triggers: 10 consecutive models that introduce no previously unseen API — no model count needs to be specified.
+
+**PyTorch:**
 
 ```bash
-# PyTorch — 300 models, 60-second mutation budget each
-python3 -m smolfuzz.main --mode full --models 300 --budget 60
-
-# TensorFlow
-python3 -m smolfuzz.run_tf --models 300 --budget 60
-
-# Both frameworks in parallel
-python3 run_both.py --models 300 --budget 60
+python3 -m smolfuzz.main --mode full --budget 60
 ```
+
+**TensorFlow:**
+
+```bash
+python3 -m smolfuzz.run_tf --budget 60
+```
+
+**Both frameworks in parallel:**
+
+```bash
+python3 run_both.py --budget 60
+```
+
+Results are written to `results/`, with bug reports under `results/bugs/`.
 
 ---
 
@@ -45,28 +70,29 @@ SMOLFuzz decouples model synthesis from the LLM provider. Switching backends req
 
 ### Ollama (default — local models)
 
-No API key required. Requires a running Ollama server.
+Qwen and DeepSeek are both required; the fuzzer round-robins between them.
 
 ```bash
 ollama serve
 ollama pull qwen2.5-coder:32b
+ollama pull deepseek-coder-v2:16b
 ```
 
 ```python
 from smolfuzz.backends.llm_client import OllamaClient
 from smolfuzz.core.synthesizer import ModelSynthesizer
 
-client = OllamaClient(models=["qwen2.5-coder:32b"])
+client = OllamaClient(models=["qwen2.5-coder:32b", "deepseek-coder-v2:16b"])
 synthesizer = ModelSynthesizer(client)
 ```
 
-Via CLI (round-robin across multiple models):
+Via CLI:
 
 ```bash
-python3 -m smolfuzz.main --mode full --llm-models "qwen2.5-coder:32b,llama3.3:70b"
+python3 -m smolfuzz.main --mode full --llm-models "qwen2.5-coder:32b,deepseek-coder-v2:16b"
 ```
 
-### OpenAI
+### OpenAI (GPT-4 Turbo)
 
 ```bash
 pip install openai
@@ -77,13 +103,11 @@ export OPENAI_API_KEY=sk-...
 from smolfuzz.backends.llm_client import OpenAIClient
 from smolfuzz.core.synthesizer import ModelSynthesizer
 
-client = OpenAIClient(model="gpt-4o")
+client = OpenAIClient(model="gpt-4-turbo")
 synthesizer = ModelSynthesizer(client)
 ```
 
-Also works with any OpenAI-compatible endpoint (Together AI, Fireworks, vLLM) by passing `base_url` to `openai.OpenAI(base_url=...)`.
-
-### Anthropic
+### Anthropic (Claude 3.5)
 
 ```bash
 pip install anthropic
@@ -94,7 +118,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 from smolfuzz.backends.llm_client import AnthropicClient
 from smolfuzz.core.synthesizer import ModelSynthesizer
 
-client = AnthropicClient(model="claude-sonnet-4-6")
+client = AnthropicClient(model="claude-3-5-sonnet-20241022")
 synthesizer = ModelSynthesizer(client)
 ```
 
@@ -146,10 +170,6 @@ smolfuzz/
 │   ├── executor.py      # Subprocess executor + 5 mutation strategies
 │   ├── oracle.py        # Differential oracle (CPU vs GPU)
 │   └── prompts.py       # LLM prompt templates
-├── backends/
-│   └── llm_client.py    # LLM backends (Ollama / OpenAI / Anthropic)
-└── docs/
-    ├── setup.md
-    ├── usage.md
-    └── api_classification.md
+└── backends/
+    └── llm_client.py    # LLM backends (Ollama / OpenAI / Anthropic)
 ```

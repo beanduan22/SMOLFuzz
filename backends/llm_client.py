@@ -4,11 +4,11 @@ LLM backend abstraction for SMOLFuzz.
 To swap backends, implement the LLMBackend protocol and pass your instance
 to ModelSynthesizer:
 
-    from smolfuzz.llm_client import LLMBackend, OllamaClient, OpenAIClient
+    from smolfuzz.backends.llm_client import LLMBackend, OllamaClient, OpenAIClient
 
-    client = OllamaClient()                       # local Ollama (default)
-    client = OpenAIClient(model="gpt-4o")         # OpenAI
-    client = AnthropicClient(model="claude-opus-4-6")  # Anthropic
+    client = OllamaClient()                                    # Ollama (default)
+    client = OpenAIClient(model="gpt-4-turbo")                 # OpenAI GPT-4 Turbo
+    client = AnthropicClient(model="claude-3-5-sonnet-20241022")  # Claude 3.5
     synthesizer = ModelSynthesizer(client)
 """
 from __future__ import annotations
@@ -60,12 +60,9 @@ class LLMBackend(Protocol):
 
 OLLAMA_URL = "http://localhost:11434"
 
-# Default model list — override via OllamaClient(models=[...]).
-# We default to a single model to avoid Ollama reloading weights on every
-# round-robin call when the GPU has no spare VRAM. Multi-model runs can
-# be enabled explicitly via the --llm-models CLI flag once memory allows.
 _DEFAULT_OLLAMA_MODELS = [
-    "qwen2.5-coder:32b",  # primary code-specialist (~20 GB VRAM)
+    "qwen2.5-coder:32b",
+    "deepseek-coder-v2:16b",
 ]
 
 
@@ -162,7 +159,7 @@ class OpenAIClient:
 
     def __init__(
         self,
-        model: str = "gpt-4o",
+        model: str = "gpt-4-turbo",
         temperature: float = 0.7,
         max_tokens: int = 4096,
     ) -> None:
@@ -213,7 +210,7 @@ class AnthropicClient:
 
     def __init__(
         self,
-        model: str = "claude-sonnet-4-6",
+        model: str = "claude-3-5-sonnet-20241022",
         temperature: float = 0.7,
         max_tokens: int = 4096,
     ) -> None:
