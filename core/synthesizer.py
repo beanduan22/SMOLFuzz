@@ -12,7 +12,7 @@ import traceback
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from .llm_client import LLMBackend
+from ..backends.llm_client import LLMBackend
 from .prompts import build_repair_prompt, build_synthesis_prompt
 
 logger = logging.getLogger(__name__)
