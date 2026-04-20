@@ -7,7 +7,7 @@ Groups (from paper):
   2.  mathematics           - arithmetic, linear algebra, trigonometry           PT=577  TF=306
   3.  reshaping             - reshape, view, slice, transpose, concat            PT=115  TF=44
   4.  logical               - comparison, boolean, conditional                   PT=86   TF=18
-  5.  distributions         - probability distributions (parametric families)    PT=13   TF=9
+  5.  distributions         - probability distributions (parametric families)    PT=13  TF=19
   6.  forward_layers        - nn layers (Conv, Linear, BN, RNN, Attention …)    PT=278  TF=566
   7.  gradients_optim       - autograd, optimizers, gradient utilities           PT=28   TF=44
   8.  storage_serial        - save/load, serialization                           PT=11   TF=3

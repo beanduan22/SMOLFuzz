@@ -359,7 +359,7 @@ def parse_args() -> argparse.Namespace:
                    help="subset = 5 models for validation; full = n_models")
     p.add_argument("--models", type=int, default=300,
                    help="Number of models to synthesise (full mode)")
-    p.add_argument("--api-set-size", type=int, default=20,
+    p.add_argument("--api-set-size", type=int, default=30,
                    help="APIs per synthesised model")
     p.add_argument("--budget", type=int, default=60,
                    help="Mutation fuzzing budget in seconds per model")

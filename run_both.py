@@ -47,9 +47,9 @@ def main() -> None:
                     help="Number of models per framework")
     ap.add_argument("--budget", type=int, default=60,
                     help="Mutation fuzzing budget in seconds per model")
-    ap.add_argument("--api-set-size", type=int, default=20,
+    ap.add_argument("--api-set-size", type=int, default=30,
                     help="APIs per PyTorch model")
-    ap.add_argument("--tf-api-set-size", type=int, default=12,
+    ap.add_argument("--tf-api-set-size", type=int, default=30,
                     help="APIs per TF model")
     ap.add_argument("--out-base", default=str(HERE / "results"),
                     help="Base output directory")

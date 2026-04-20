@@ -533,7 +533,7 @@ def main() -> None:
                     help="Number of models to synthesise")
     ap.add_argument("--budget", type=int, default=60,
                     help="Mutation fuzzing budget in seconds per model")
-    ap.add_argument("--api-set-size", type=int, default=20,
+    ap.add_argument("--api-set-size", type=int, default=30,
                     help="APIs per synthesised model")
     ap.add_argument("--out", default=str(HERE / "results" / "tf_run"),
                     help="Output directory")
