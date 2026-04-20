@@ -1,7 +1,0 @@
-The previous script failed with: {ERROR_BRIEF}.
-Minimal fix required, preserving original dependency intent and allowed APIs:
-- Keep chain length within [{MIN_CHAIN}, {MAX_CHAIN}].
-- Keep the same dependency types: {DEPENDENCY_TYPES}.
-- Remove root-cause ops or replace with numerically stable equivalents from {API_SET}.
-- Ensure determinism and re-run the CPU/GPU oracle with RTOL={RTOL}, ATOL={ATOL}.
-Return the FULL corrected script only.

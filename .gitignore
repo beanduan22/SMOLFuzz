@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# SMOLFuzz runtime outputs
+results/
+workspace/
+*.pt
+*.pt.inputs.pt
+
+# Bug reports — kept locally, not published
+bugs/
+Fuzzing/
+high_confidence_bugs/
+
+# Claude Code session files
+.claude/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
