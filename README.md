@@ -8,7 +8,7 @@ SMOLFuzz is a differential fuzzer that uses an LLM to synthesize PyTorch and Ten
 
 ## Setup
 
-**Requirements:** Python ≥ 3.10, PyTorch ≥ 2.1 with CUDA, TensorFlow ≥ 2.13 with GPU, NVIDIA GPU with CUDA ≥ 11.8.
+**Requirements:** Python ≥ 3.10, PyTorch ≥ 2.9.1 with CUDA, TensorFlow ≥ 2.21 with GPU, NVIDIA GPU with CUDA ≥ 11.8.
 
 ```bash
 pip install -r requirements.txt
