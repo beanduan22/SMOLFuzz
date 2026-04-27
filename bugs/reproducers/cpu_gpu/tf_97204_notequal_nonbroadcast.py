@@ -11,14 +11,14 @@ with tf.device("GPU:0"):
     try:
         print("gpu:", tf.raw_ops.NotEqual(x=x, y=y, incompatible_shape_error=False))
     except tf.errors.InvalidArgumentError as e:
-        print("gpu:", "InvalidArgumentError")
+        print("gpu: InvalidArgumentError:", str(e).splitlines()[0][:80])
 
-x = tf.zeros((3, 5), dtype=tf.int32)
-y = tf.zeros((4, 5), dtype=tf.int32)
+x = tf.zeros((2, 3, 4), dtype=tf.float32)
+y = tf.zeros((1, 5, 6, 7, 4), dtype=tf.float32)
 with tf.device("CPU:0"):
-    print("cpu (3,5)x(4,5)/int32:", tf.raw_ops.NotEqual(x=x, y=y, incompatible_shape_error=False))
+    print("cpu (2,3,4)x(1,5,6,7,4):", tf.raw_ops.NotEqual(x=x, y=y, incompatible_shape_error=False))
 with tf.device("GPU:0"):
     try:
         print("gpu:", tf.raw_ops.NotEqual(x=x, y=y, incompatible_shape_error=False))
-    except tf.errors.InvalidArgumentError:
-        print("gpu:", "InvalidArgumentError")
+    except tf.errors.InvalidArgumentError as e:
+        print("gpu: InvalidArgumentError:", str(e).splitlines()[0][:80])
