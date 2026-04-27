@@ -21,10 +21,11 @@ os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent))
 
-from smolfuzz.api_loader import group_summary, load_and_classify
-from smolfuzz.llm_client import OllamaClient
-from smolfuzz.prompts import build_tf_repair_prompt, build_tf_synthesis_prompt
-from smolfuzz.selector import MultiRouletteSelector
+from smolfuzz.core.api_loader import group_summary, load_and_classify
+from smolfuzz.backends.llm_client import OllamaClient
+from smolfuzz.core.prompts import build_tf_repair_prompt, build_tf_synthesis_prompt
+from smolfuzz.core.selector import MultiRouletteSelector
+from smolfuzz.core.skeletons import get_skeletons, Skeleton
 
 logging.basicConfig(
     level=logging.INFO,
@@ -131,27 +132,46 @@ _RANDOMNESS_RX = re.compile(
 )
 
 
-def _extract_class(text: str) -> str | None:
+def _extract_program(text: str) -> str | None:
     text = re.sub(r"```[a-z]*\n?", "", text).strip()
     text = re.sub(r"```\s*$", "", text).strip()
-    m = re.search(r"(class\s+Model\b.*?)(?=\nclass\s|\Z)", text, re.DOTALL)
-    if not m:
+    if "class Model" not in text:
         return None
-    src = m.group(1).strip()
-    if "def call(" not in src:
+    if "def call(" not in text:
         return None
-    return src
+    return text
 
 
-def _extract_used_apis(src: str) -> list[str]:
-    m = re.search(r"USED_APIS\s*=\s*(\[.*?\])", src, re.DOTALL)
-    if not m:
-        return []
+def _extract_attr_paths(src: str) -> set[str]:
+    import ast as _ast
     try:
-        import ast as _ast
-        return list(_ast.literal_eval(m.group(1)))
+        tree = _ast.parse(src)
     except Exception:
-        return []
+        return set()
+    used: set[str] = set()
+
+    class V(_ast.NodeVisitor):
+        def visit_Attribute(self, node: _ast.Attribute) -> None:
+            parts: list[str] = []
+            cur: _ast.AST | None = node
+            while isinstance(cur, _ast.Attribute):
+                parts.append(cur.attr)
+                cur = cur.value
+            if isinstance(cur, _ast.Name):
+                parts.append(cur.id)
+                used.add(".".join(reversed(parts)))
+            self.generic_visit(node)
+
+    V().visit(tree)
+    return used
+
+
+def _extract_used_apis(src: str, candidate_pool: list[str] | None = None) -> list[str]:
+    attrs = _extract_attr_paths(src)
+    if candidate_pool is None:
+        return sorted(attrs)
+    pool = set(candidate_pool)
+    return sorted(api for api in pool if api in attrs)
 
 
 def _has_random_in_model(src: str) -> bool:
@@ -163,20 +183,21 @@ MAX_REPAIR_ATTEMPTS = 3
 
 def synthesize_tf_model(
     llm: OllamaClient,
+    skeleton: Skeleton,
     apis: list[str],
     ws_dir: Path,
     mid: int,
     x_val: np.ndarray,
     validator_timeout: int = 40,
 ) -> tuple[str | None, list[str], int]:
-    prompt = build_tf_synthesis_prompt(apis)
+    prompt = build_tf_synthesis_prompt(apis, skeleton.template)
     try:
         raw = llm.generate(prompt, advance=True)
     except Exception as exc:
         log.warning("m%04d: LLM error: %s", mid, exc)
         return None, [], 1
 
-    src = _extract_class(raw)
+    src = _extract_program(raw)
     attempts = 1
 
     while attempts <= MAX_REPAIR_ATTEMPTS + 1:
@@ -189,8 +210,7 @@ def synthesize_tf_model(
         else:
             err = _cpu_validate(src, x_val, ws_dir, mid, validator_timeout)
             if err is None:
-                used = _extract_used_apis(src)
-                return src, used, attempts
+                return src, _extract_used_apis(src, apis), attempts
 
         if attempts > MAX_REPAIR_ATTEMPTS:
             return None, [], attempts
@@ -202,7 +222,7 @@ def synthesize_tf_model(
         except Exception as exc:
             log.warning("m%04d: repair LLM error: %s", mid, exc)
             return None, [], attempts
-        src = _extract_class(raw)
+        src = _extract_program(raw)
         attempts += 1
 
     return None, [], attempts
@@ -442,7 +462,7 @@ def main() -> None:
                     help="Number of models to synthesise")
     ap.add_argument("--budget", type=int, default=60,
                     help="Mutation fuzzing budget in seconds per model")
-    ap.add_argument("--api-set-size", type=int, default=30,
+    ap.add_argument("--api-set-size", type=int, default=12,
                     help="APIs per synthesised model")
     ap.add_argument("--out", default=str(HERE / "results" / "tf_run"),
                     help="Output directory")
@@ -470,6 +490,7 @@ def main() -> None:
     selectable = {k: v for k, v in groups.items() if k != "_excluded"}
     selector = MultiRouletteSelector(selectable)
     llm = OllamaClient()
+    skeletons = get_skeletons("tensorflow")
 
     rng = np.random.RandomState(args.seed)
 
@@ -487,6 +508,19 @@ def main() -> None:
     apis_executed: set[str]  = set()
 
     strategy_counts: dict[str, int] = {n: 1 for n in _MUT_NAMES}
+    NEAR_MISS_REL_ERR = 1e-2
+
+    def _is_tf_near_miss(detail: str) -> bool:
+        if not detail:
+            return False
+        d = detail.lower()
+        if "rel_err=" in d:
+            try:
+                tok = d.split("rel_err=", 1)[1].split()[0]
+                return float(tok) >= NEAR_MISS_REL_ERR
+            except Exception:
+                return False
+        return False
 
     def _pick_strategy() -> str:
         total = sum(strategy_counts.values())
@@ -501,6 +535,21 @@ def main() -> None:
     consecutive_no_new_apis = 0
     coverage_history: list[tuple[int, int]] = []
 
+    def _update_no_new_api_streak(used_apis: list[str]) -> bool:
+        nonlocal consecutive_no_new_apis
+        new_apis = set(used_apis) - apis_executed
+        if new_apis:
+            consecutive_no_new_apis = 0
+            return False
+        consecutive_no_new_apis += 1
+        if consecutive_no_new_apis >= MAX_NO_NEW_API_STREAK:
+            log.info(
+                "Early stop: %d consecutive models introduced no new APIs",
+                MAX_NO_NEW_API_STREAK,
+            )
+            return True
+        return False
+
     log.info("SMOLFuzz TF (CPU vs GPU) | models=%d budget=%ds → %s",
              args.models, args.budget, out_dir)
 
@@ -509,24 +558,36 @@ def main() -> None:
         log.info("=" * 60)
         log.info("Model %d / %d", mid, args.models)
 
-        apis = selector.select(n=args.api_set_size)
+        skeleton = skeletons[(mid - 1) % len(skeletons)]
+        plan = selector.select_plan(n=args.api_set_size)
+        apis = plan.all_apis
+        selector.record_attempts(apis)
         apis_attempted.update(apis)
-        log.info("Selected %d APIs", len(apis))
+        log.info(
+            "Selected skeleton=%s (%s), pool=%d",
+            skeleton.skeleton_id,
+            skeleton.description,
+            len(apis),
+        )
 
         x_base = rng.randn(4, 8).astype(np.float32)
 
         src, used_apis, attempts = synthesize_tf_model(
-            llm, apis, ws_dir, mid, x_base,
+            llm,
+            skeleton,
+            apis,
+            ws_dir,
+            mid,
+            x_base,
         )
         if src is None:
             log.warning("m%04d: synthesis failed after %d attempts", mid, attempts)
             stats["failed_synth"] += 1
-            selector.record_usage(apis, triggered_bug=False)
             continue
 
         model_file = model_dir / f"model_{mid:04d}.py"
         model_file.write_text(
-            f"# SMOLFuzz TF model {mid} | attempts={attempts}\n"
+            f"# SMOLFuzz TF model {mid} | skeleton={skeleton.skeleton_id} | attempts={attempts}\n"
             f"# APIS_SELECTED = {apis}\n"
             f"# USED_APIS = {used_apis}\n\n{src}\n"
         )
@@ -541,12 +602,12 @@ def main() -> None:
             log.warning("m%04d: baseline crash (%s model): %s",
                         mid, tag, (r_base["crash"] or "")[:100])
             stats["invalid_models"] += 1
-            selector.record_usage(used_apis, triggered_bug=False)
+            selector.record_usage(used_apis, anomaly_detected=False)
             continue
         if r_base["cpu"] is None or r_base["gpu"] is None:
             log.warning("m%04d: baseline missing output — invalid", mid)
             stats["invalid_models"] += 1
-            selector.record_usage(used_apis, triggered_bug=False)
+            selector.record_usage(used_apis, anomaly_detected=False)
             continue
 
         base_type, base_detail = compare_outputs(
@@ -561,14 +622,16 @@ def main() -> None:
                 mid, base_type, base_detail[:100],
             )
             stats["invalid_models"] += 1
-            selector.record_usage(used_apis, triggered_bug=False)
+            selector.record_usage(used_apis, anomaly_detected=False)
             continue
 
+        newly_executed = set(used_apis) - apis_executed
         apis_executed.update(used_apis)
         coverage_history.append((mid, len(apis_executed)))
         log.info("m%04d: baseline OK — fuzzing for %ds", mid, args.budget)
 
         found_bug = False
+        saw_anomaly = False
         mut_count = 0
         bstart = time.time()
         tried_in_sweep: set[str] = set()
@@ -608,6 +671,8 @@ def main() -> None:
 
             if bug_type:
                 strategy_counts[mut_name] += 1
+                saw_anomaly = True
+                sweep_anomaly = True
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                 bname = f"bug_{bug_type.lower()}_m{mid:04d}_{mut_name}_{ts}"
                 entry = dict(
@@ -626,9 +691,13 @@ def main() -> None:
                 found_bug = True
                 break
 
+            if _is_tf_near_miss(detail):
+                strategy_counts[mut_name] += 1
+                sweep_anomaly = True
+
             if set(tried_in_sweep) >= set(_MUT_NAMES):
                 if not sweep_anomaly:
-                    log.info("  m%04d: full sweep — no anomaly, re-sampling inputs", mid)
+                    log.info("  m%04d: full sweep — no anomaly or near-miss, re-sampling inputs", mid)
                     x_cur = rng.randn(*x_base.shape).astype(np.float32)
                 tried_in_sweep = set()
                 sweep_anomaly = False
@@ -641,19 +710,10 @@ def main() -> None:
             log.info("m%04d: clean after %d mutations (%.1fs budget)",
                      mid, mut_count, time.time() - bstart)
 
-        selector.record_usage(used_apis, triggered_bug=found_bug)
+        selector.record_usage(used_apis, anomaly_detected=saw_anomaly)
 
-        new_apis = set(used_apis) - apis_executed
-        if new_apis:
-            consecutive_no_new_apis = 0
-        else:
-            consecutive_no_new_apis += 1
-            if consecutive_no_new_apis >= MAX_NO_NEW_API_STREAK:
-                log.info(
-                    "Early stop: %d consecutive models introduced no new APIs",
-                    MAX_NO_NEW_API_STREAK,
-                )
-                break
+        if _update_no_new_api_streak(used_apis):
+            break
 
     log.info("=" * 60)
     log.info(
@@ -669,6 +729,26 @@ def main() -> None:
     n_exec  = len(apis_executed)
     log.info("API COVERAGE  total=%d attempted=%d executed=%d",
              n_total, n_att, n_exec)
+    selector_stats = selector.stats()
+    log.info("  Per-group attempted/executed:")
+    for gname, apis in selectable.items():
+        total = len(apis)
+        if total == 0:
+            continue
+        att_n = sum(1 for a in apis if a in apis_attempted)
+        exec_n = sum(1 for a in apis if a in apis_executed)
+        conv = (100.0 * exec_n / att_n) if att_n else 0.0
+        log.info(
+            "    %-22s : attempted %3d / %3d (%.1f%%) | executed %3d / %3d (%.1f%%) | exec/att %.1f%%",
+            gname,
+            att_n, total, 100.0 * att_n / total,
+            exec_n, total, 100.0 * exec_n / total,
+            conv,
+        )
+    log.info("  Groups with zero executed APIs: %s",
+             selector_stats.get("groups_zero_executed", []))
+    log.info("  Groups with low executed/attempted conversion: %s",
+             selector_stats.get("groups_low_conversion", []))
     coverage_data = {
         "n_models": args.models,
         "n_total_apis": n_total,
@@ -679,10 +759,12 @@ def main() -> None:
         "coverage_history": coverage_history,
         "per_group": {
             g: {"total": len(apis),
+                "attempted": sum(1 for a in apis if a in apis_attempted),
                 "executed": sum(1 for a in apis if a in apis_executed)}
             for g, apis in selectable.items()
         },
         "totals": stats,
+        "selector_stats": selector_stats,
     }
     (out_dir / "coverage.json").write_text(json.dumps(coverage_data, indent=2))
 

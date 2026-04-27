@@ -16,6 +16,7 @@ from .core.executor import ModelExecutor, has_randomness, has_nondet_gpu_op
 from .backends.llm_client import OllamaClient
 from .core.oracle import DifferentialOracle
 from .core.selector import MultiRouletteSelector
+from .core.skeletons import get_skeletons
 from .core.synthesizer import ModelSynthesizer
 
 logging.basicConfig(
@@ -31,6 +32,8 @@ DEFAULT_OUTPUT   = HERE / "results"
 
 _MUTATION_NAMES = {1: "add_noise", 2: "scale_small", 3: "mask",
                    4: "uniform",   5: "scale_large"}
+
+NEAR_MISS_REL_ERR = 1e-2
 
 
 def run(
@@ -52,12 +55,19 @@ def run(
     selectable_groups = {k: v for k, v in groups.items() if k != "_excluded"}
     selector    = MultiRouletteSelector(selectable_groups)
     client      = OllamaClient(models=llm_models) if llm_models else OllamaClient()
-    synthesizer = ModelSynthesizer(client)
+    synthesizer = ModelSynthesizer(client, target_lib="PyTorch")
     executor    = ModelExecutor(output_dir / "workspace")
     oracle      = DifferentialOracle(output_dir)
+    skeletons   = get_skeletons("pytorch")
 
-    logger.info("Starting SMOLFuzz | models=%d api_set=%d budget=%ds",
-                n_models, api_set_size, fuzzing_budget_s)
+    if n_models > 0:
+        logger.info("Starting SMOLFuzz | models=%d api_set=%d budget=%ds",
+                    n_models, api_set_size, fuzzing_budget_s)
+    else:
+        logger.info(
+            "Starting SMOLFuzz | models=until_termination api_set=%d budget=%ds",
+            api_set_size, fuzzing_budget_s,
+        )
     logger.info("LLM models: %s", client._models)
 
     total_bugs     = 0
@@ -86,25 +96,69 @@ def run(
                 return s
         return max(strategy_counts, key=strategy_counts.__getitem__)
 
+    def _is_near_miss(report) -> bool:
+        if report.is_bug() or report.is_nondet():
+            return True
+        detail = (report.detail or "").lower()
+        if "rel_err=" in detail:
+            try:
+                token = detail.split("rel_err=", 1)[1].split()[0]
+                rel = float(token)
+                return rel >= NEAR_MISS_REL_ERR
+            except Exception:
+                return False
+        return False
+
     MAX_NO_NEW_API_STREAK = 10
     consecutive_no_new_apis = 0
 
-    for i in range(n_models):
+    def _update_no_new_api_streak(used_apis: list[str]) -> bool:
+        nonlocal consecutive_no_new_apis
+        new_apis = set(used_apis) - apis_executed
+        if new_apis:
+            consecutive_no_new_apis = 0
+            return False
+        consecutive_no_new_apis += 1
+        if consecutive_no_new_apis >= MAX_NO_NEW_API_STREAK:
+            logger.info(
+                "Early stop: %d consecutive models introduced no new APIs",
+                MAX_NO_NEW_API_STREAK,
+            )
+            return True
+        return False
+
+    i = 0
+    while True:
+        if n_models > 0 and i >= n_models:
+            break
+        model_num = i + 1
+        skeleton = skeletons[i % len(skeletons)]
+        i += 1
         logger.info("=" * 60)
-        logger.info("Model %d / %d", i + 1, n_models)
-
-        api_set = selector.select(n=api_set_size)
+        if n_models > 0:
+            logger.info("Model %d / %d", model_num, n_models)
+        else:
+            logger.info("Model %d", model_num)
+        plan = selector.select_plan(n=api_set_size)
+        api_set = plan.all_apis
+        selector.record_attempts(api_set)
         apis_attempted.update(api_set)
-        logger.info("Selected %d APIs", len(api_set))
+        logger.info(
+            "Selected skeleton=%s (%s), pool=%d",
+            skeleton.skeleton_id,
+            skeleton.description,
+            len(api_set),
+        )
 
-        synth = synthesizer.synthesize(api_set)
+        synth = synthesizer.synthesize(skeleton, api_set)
 
         model_path = models_dir / f"model_{synth.model_id:04d}.py"
         model_path.write_text(
             f"# SMOLFuzz model {synth.model_id} | llm={synth.llm_model}"
+            f" | skeleton={synth.skeleton_id}"
             f" | attempts={synth.attempts} | apis={len(synth.used_apis)}"
             f" | error={'yes' if synth.error else 'no'}\n"
-            f"# USED_APIS_SELECTED = {api_set}\n\n"
+            f"# CANDIDATE_POOL = {api_set}\n\n"
             + synth.code
         )
 
@@ -112,7 +166,7 @@ def run(
             logger.error("Synthesis failed for model %d: %s",
                          synth.model_id, synth.error[:200])
             failed_synth += 1
-            selector.record_usage(synth.used_apis, triggered_bug=False)
+            selector.record_usage(synth.used_apis, anomaly_detected=False)
             continue
 
         if has_randomness(synth.code):
@@ -122,7 +176,7 @@ def run(
                 synth.model_id,
             )
             rejected_random += 1
-            selector.record_usage(synth.used_apis, triggered_bug=False)
+            selector.record_usage(synth.used_apis, anomaly_detected=False)
             continue
 
         if has_nondet_gpu_op(synth.code):
@@ -152,13 +206,13 @@ def run(
             if not gpu_ok:
                 logger.warning("  GPU error: %s", pair.gpu.error[:200])
             invalid_models += 1
-            selector.record_usage(synth.used_apis, triggered_bug=False)
+            selector.record_usage(synth.used_apis, anomaly_detected=False)
             continue
 
         if inputs is None:
             logger.warning("Model %d: no inputs recovered — skipping", synth.model_id)
             invalid_models += 1
-            selector.record_usage(synth.used_apis, triggered_bug=False)
+            selector.record_usage(synth.used_apis, anomaly_detected=False)
             continue
 
         apis_executed.update(synth.used_apis)
@@ -168,10 +222,11 @@ def run(
                     fuzzing_budget_s)
 
         found_bug = False
+        saw_anomaly = False
         mutation_count = 0
         budget_start = time.time()
         tried_in_sweep: set[int] = set()
-        sweep_anomaly = False
+        sweep_signal = False
         cur_inputs = inputs
 
         while time.time() - budget_start < fuzzing_budget_s:
@@ -193,23 +248,31 @@ def run(
                 strategy_counts[strategy] += 1
                 total_bugs += 1
                 found_bug = True
+                saw_anomaly = True
+                sweep_signal = True
                 break
-            elif mreport.is_nondet():
+
+            if _is_near_miss(mreport):
                 strategy_counts[strategy] += 1
-                sweep_anomaly = True
-                total_nondet += 1
-                logger.info("  Non-deterministic (not counted as bug)")
-            elif mreport.is_generation_failure():
-                total_gen_fail += 1
-                logger.info("  Generation failure (not counted as bug)")
+                sweep_signal = True
+                if mreport.is_nondet():
+                    total_nondet += 1
+                    saw_anomaly = True
+                    logger.info("  Non-deterministic (near-miss, not a bug)")
+                elif mreport.is_generation_failure():
+                    total_gen_fail += 1
+                    saw_anomaly = True
+                    logger.info("  Generation failure (near-miss, not a bug)")
+                else:
+                    logger.info("  Near-miss (rel_err >= %.0e)", NEAR_MISS_REL_ERR)
             else:
                 logger.info("  Clean (no bug)")
                 total_clean += 1
 
             if len(tried_in_sweep) == 5:
-                if not sweep_anomaly:
+                if not sweep_signal:
                     logger.info(
-                        "  Full strategy sweep with no anomaly — re-sampling inputs"
+                        "  Full strategy sweep with no anomaly or near-miss — re-sampling inputs"
                     )
                     new_pair, new_inputs = executor.run_baseline(
                         synth.code, synth.model_id
@@ -219,7 +282,7 @@ def run(
                             and new_pair.gpu.status == "ok"):
                         cur_inputs = new_inputs
                 tried_in_sweep = set()
-                sweep_anomaly = False
+                sweep_signal = False
 
         elapsed_total = time.time() - budget_start
         if found_bug:
@@ -229,25 +292,16 @@ def run(
             logger.info("Model %d: no bug found after %d mutations (%.1fs budget)",
                         synth.model_id, mutation_count, elapsed_total)
 
-        selector.record_usage(synth.used_apis, triggered_bug=found_bug)
+        selector.record_usage(synth.used_apis, anomaly_detected=saw_anomaly)
 
-        new_apis = set(synth.used_apis) - apis_executed
-        if new_apis:
-            consecutive_no_new_apis = 0
-        else:
-            consecutive_no_new_apis += 1
-            if consecutive_no_new_apis >= MAX_NO_NEW_API_STREAK:
-                logger.info(
-                    "Early stop: %d consecutive models introduced no new APIs",
-                    MAX_NO_NEW_API_STREAK,
-                )
-                break
+        if _update_no_new_api_streak(synth.used_apis):
+            break
 
     logger.info("=" * 60)
     logger.info(
         "DONE | models=%d failed_synth=%d invalid=%d rejected_random=%d "
         "bugs=%d clean=%d nondet=%d gen_fail=%d",
-        n_models, failed_synth, invalid_models, rejected_random,
+        i, failed_synth, invalid_models, rejected_random,
         total_bugs, total_clean, total_nondet, total_gen_fail,
     )
 
@@ -262,18 +316,31 @@ def run(
     logger.info("  APIs executed   (both devices): %d  (%.1f%%)",
                 n_exec, 100.0 * n_exec / max(1, n_total))
 
-    logger.info("  Per-group executed:")
+    logger.info("  Per-group attempted/executed:")
     for gname, apis in selectable_groups.items():
         total = len(apis)
         if total == 0:
             continue
+        att_n = sum(1 for a in apis if a in apis_attempted)
         exec_n = sum(1 for a in apis if a in apis_executed)
-        logger.info("    %-22s : %3d / %3d  (%.1f%%)",
-                    gname, exec_n, total, 100.0 * exec_n / total)
+        conv = (100.0 * exec_n / att_n) if att_n else 0.0
+        logger.info(
+            "    %-22s : attempted %3d / %3d (%.1f%%) | executed %3d / %3d (%.1f%%) | exec/att %.1f%%",
+            gname,
+            att_n, total, 100.0 * att_n / total,
+            exec_n, total, 100.0 * exec_n / total,
+            conv,
+        )
+
+    selector_stats = selector.stats()
+    zero_exec_groups = selector_stats.get("groups_zero_executed", [])
+    low_conversion_groups = selector_stats.get("groups_low_conversion", [])
+    logger.info("  Groups with zero executed APIs: %s", zero_exec_groups)
+    logger.info("  Groups with low executed/attempted conversion: %s", low_conversion_groups)
 
     import json as _json
     coverage_data = {
-        "n_models": n_models,
+        "n_models": i,
         "n_total_apis": n_total,
         "n_attempted": n_att,
         "n_executed": n_exec,
@@ -282,6 +349,7 @@ def run(
         "coverage_history": coverage_history,
         "per_group": {
             g: {"total": len(apis),
+                "attempted": sum(1 for a in apis if a in apis_attempted),
                 "executed": sum(1 for a in apis if a in apis_executed)}
             for g, apis in selectable_groups.items()
         },
@@ -292,12 +360,13 @@ def run(
             "invalid_models": invalid_models,
             "rejected_random": rejected_random,
         },
+        "selector_stats": selector_stats,
     }
     (output_dir / "coverage.json").write_text(_json.dumps(coverage_data, indent=2))
     logger.info("Coverage → %s", output_dir / "coverage.json")
 
     logger.info("LLM stats: %s", client.stats())
-    logger.info("Selector stats: %s", selector.stats())
+    logger.info("Selector stats: %s", selector_stats)
     logger.info("Bug reports → %s", output_dir / "bugs")
 
 
@@ -305,9 +374,9 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="SMOLFuzz: LLM-based DL library fuzzer")
     p.add_argument("--mode", choices=["subset", "full"], default="subset",
                    help="subset = 5 models for validation; full = n_models")
-    p.add_argument("--models", type=int, default=300,
-                   help="Number of models to synthesise (full mode)")
-    p.add_argument("--api-set-size", type=int, default=30,
+    p.add_argument("--models", type=int, default=0,
+                   help="Number of models to synthesise in full mode; 0 means stop only on the no-new-API condition")
+    p.add_argument("--api-set-size", type=int, default=12,
                    help="APIs per synthesised model")
     p.add_argument("--budget", type=int, default=60,
                    help="Mutation fuzzing budget in seconds per model")
@@ -325,12 +394,12 @@ if __name__ == "__main__":
                  if args.llm_models else None
 
     if args.mode == "subset":
-        logger.info("SUBSET VALIDATION MODE: 5 models, 20 APIs each")
+        logger.info("SUBSET VALIDATION MODE: 5 models")
         run(
             api_file=args.api_file,
             output_dir=args.output_dir / "subset2",
             n_models=5,
-            api_set_size=20,
+            api_set_size=12,
             fuzzing_budget_s=30,
             llm_models=llm_models,
         )

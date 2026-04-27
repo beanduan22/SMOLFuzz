@@ -1,0 +1,65 @@
+{
+  "issue_collection": {
+    "survey_start": "2021-01",
+    "survey_end": "2026-04",
+    "raw_hits": 6041,
+    "unique_hits": 5846,
+    "filtered_pool": 1519,
+    "fix_verified_pool": 880,
+    "unverified_pool": 639,
+    "sample_size": 200,
+    "fix_verified_sample": 116,
+    "unverified_sample": 84,
+    "human_agreement": 184,
+    "human_total": 200,
+    "cohen_kappa": 0.89
+  },
+  "strata": [
+    {
+      "stratum": "Fix-verified",
+      "framework": "PyTorch",
+      "issues": 62,
+      "state": 40,
+      "non_state": 18,
+      "u_dup": 4
+    },
+    {
+      "stratum": "Fix-verified",
+      "framework": "TensorFlow",
+      "issues": 54,
+      "state": 32,
+      "non_state": 20,
+      "u_dup": 2
+    },
+    {
+      "stratum": "Unverified",
+      "framework": "PyTorch",
+      "issues": 44,
+      "state": 24,
+      "non_state": 19,
+      "u_dup": 1
+    },
+    {
+      "stratum": "Unverified",
+      "framework": "TensorFlow",
+      "issues": 40,
+      "state": 20,
+      "non_state": 19,
+      "u_dup": 1
+    }
+  ],
+  "dimensions": {
+    "PyTorch": {
+      "Gradient tracking": 21,
+      "Execution mode": 16,
+      "Distribution strategy": 22,
+      "Other state": 5
+    },
+    "TensorFlow": {
+      "Gradient tracking": 9,
+      "Execution mode": 28,
+      "Distribution strategy": 12,
+      "Other state": 3
+    }
+  }
+}
