@@ -26,8 +26,9 @@ workspace/
 *.pt
 *.pt.inputs.pt
 
-# Bug reports — kept locally, not published
-bugs/
+# Bug reports — raw dumps kept local; curated reproducers are published
+bugs/*
+!bugs/reproducers/
 Fuzzing/
 high_confidence_bugs/
 

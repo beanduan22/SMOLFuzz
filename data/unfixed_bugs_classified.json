@@ -1,0 +1,2709 @@
+{
+  "counts": {
+    "crash_or_internal_error": 15,
+    "cpu_vs_gpu": 27,
+    "compiler_vs_eager": 33
+  },
+  "total_classified": 71,
+  "cross_bucket": 4,
+  "compiler_vs_eager": [
+    {
+      "repo": "pytorch/pytorch",
+      "number": 165506,
+      "title": "[torch.compile] dynamic shape kernel mismatch",
+      "url": "https://github.com/pytorch/pytorch/issues/165506",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "oncall: pt2",
+        "module: dynamic shapes",
+        "module: inductor",
+        "PT2-Bug-Bash"
+      ],
+      "created_at": "2025-10-15T02:30:20Z",
+      "updated_at": "2026-03-23T22:17:12Z",
+      "comments": 9,
+      "reactions": 2,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "torch.Size",
+        "torch.autograd.backward",
+        "torch.compile",
+        "torch.ops.aten._scaled_dot_product_efficient_attention_backward.default"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nNote: Unfortunately, I have not been able to reduce this to a small test case yet. Therefore, I'll have to go into some details of my real use case.\n\nI'm applying torch.compile to *training* of `diffusers` image models.\n\nRecent models have been using a variable transformer sequence length (depending on the length of the prompt), which results in dynamic shapes for torch.compile. torch.compile is called with fullgraph=True, and the defaults otherwise.\n",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 173123,
+      "title": "[DTensor] Gradient of unused output becomes plain torch.Tensor in backward, causing type mismatch with torch.compile",
+      "url": "https://github.com/pytorch/pytorch/issues/173123",
+      "state": "open",
+      "labels": [
+        "oncall: distributed",
+        "module: dtensor"
+      ],
+      "created_at": "2026-01-23T00:24:07Z",
+      "updated_at": "2026-01-25T19:34:24Z",
+      "comments": 6,
+      "reactions": 1,
+      "categories": [
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch.Size",
+        "torch.Tensor",
+        "torch.compile",
+        "torch.distributed.tensor.DTensor",
+        "torch.float32"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n**Summary**\n\nWhen an op with DTensor inputs returns multiple DTensor outputs and one output is unused in the downstream computation, the gradient for that unused output is returned as a plain torch.Tensor of zeros instead of a DTensor. This causes a type mismatch during the backward pass when combined with torch.compile.\n\n**Reproduce**\n",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 121631,
+      "title": "[inductor] Incorrect handle of `autocast` results in type mismatch",
+      "url": "https://github.com/pytorch/pytorch/issues/121631",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "oncall: pt2",
+        "module: inductor"
+      ],
+      "created_at": "2024-03-11T12:41:41Z",
+      "updated_at": "2025-07-11T00:58:00Z",
+      "comments": 3,
+      "reactions": 1,
+      "categories": [
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch.compile",
+        "torch.distributed",
+        "torch.distributed.fsdp.fully_sharded_data_parallel",
+        "torch.nn.Module",
+        "torch.nn.ModuleList",
+        "torch.optim.AdamW",
+        "torch.optim.lr_scheduler.CosineAnnealingLR",
+        "torch.scalar_tensor"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n```\n...\n  File \"/home/yyc/.local/miniconda3/envs/zero_env/lib/python3.10/site-packages/torch/_inductor/compile_fx.py\", line 611, in run\n    return model(new_inputs)\n  File \"/home/yyc/.local/miniconda3/envs/zero_env/lib/python3.10/site-packages/torch/_inductor/codecache.py\", line 892, in _run_from_cache\n    return compiled_graph.compiled_artifact(inputs)",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 171190,
+      "title": "torch.compile (Inductor) silently ignores explicit dtype casts in SDPA, diverging from eager semantics",
+      "url": "https://github.com/pytorch/pytorch/issues/171190",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "oncall: pt2",
+        "topic: fuzzer",
+        "module: sdpa"
+      ],
+      "created_at": "2025-12-23T15:57:12Z",
+      "updated_at": "2026-01-27T00:54:58Z",
+      "comments": 2,
+      "reactions": 1,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch.Size",
+        "torch.compile",
+        "torch.manual_seed",
+        "torch.matmul",
+        "torch.nn",
+        "torch.no_grad",
+        "torch.randn"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n# \ud83d\udc1b Describe the bug\n\n`torch.compile` with Inductor backend produces different behavior than eager mode when explicit dtype conversions exist in scaled dot-product attention patterns. Specifically, when the attention computation involves explicit `.float()` and `.half()` type conversions, eager mode raises a dtype mismatch error, but the compiled version executes successfully by silently ignoring these conversions.\n\nThis violates the semantic equivalence guarantee of `torch.compile` - compiled code should behave identically to eager mode.\n",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 158544,
+      "title": "Bug or Precision Tradeoff? Small `torch.compile` Mismatch with `max-autotune-no-cudagraphs` on CUDA",
+      "url": "https://github.com/pytorch/pytorch/issues/158544",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "oncall: pt2",
+        "module: inductor"
+      ],
+      "created_at": "2025-07-17T07:36:06Z",
+      "updated_at": "2025-07-22T15:59:00Z",
+      "comments": 1,
+      "reactions": 1,
+      "categories": [
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch.Tensor",
+        "torch.compile",
+        "torch.float32",
+        "torch.float64",
+        "torch.manual_seed",
+        "torch.nn",
+        "torch.no_grad",
+        "torch.randn",
+        "torch.testing.assert_close"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n## Reproduction Script\n\n```python\nimport torch\nimport torch.nn as nn\n",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 137213,
+      "title": "`aot_eager` does not error on mismatching data-types in out tensors.",
+      "url": "https://github.com/pytorch/pytorch/issues/137213",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "oncall: pt2",
+        "module: fakeTensor",
+        "module: aotdispatch",
+        "module: pt2-dispatcher"
+      ],
+      "created_at": "2024-10-02T19:50:09Z",
+      "updated_at": "2026-02-22T20:34:44Z",
+      "comments": 11,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch.aminmax",
+        "torch.compile",
+        "torch.empty",
+        "torch.float64",
+        "torch.rand",
+        "torch.return_types.aminmax_out"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nThere is an inconsistency when running `torch.aminmax` out variant on eager and inductor. This behavior is also found when using `aot_eager` backend.\n\n```python\ndef run(op):\n    inp = torch.rand(10, 10)\n    out1 = torch.empty(10, dtype=torch.float64)",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 178482,
+      "title": "torch.compile(dynamic=True) ignores incompatible `out` tensor for `torch.empty` and returns wrong shape",
+      "url": "https://github.com/pytorch/pytorch/issues/178482",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "module: correctness (silent)",
+        "module: tensor creation",
+        "bot-triaged"
+      ],
+      "created_at": "2026-03-26T06:22:07Z",
+      "updated_at": "2026-04-02T22:40:43Z",
+      "comments": 8,
+      "reactions": 0,
+      "categories": [
+        "numerical_accuracy"
+      ],
+      "apis": [
+        "torch.compile",
+        "torch.empty",
+        "torch.float32"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n### Summary\n`torch.empty(..., out=...)` behaves inconsistently under `torch.compile(dynamic=True)`: an incompatible `out` tensor that should raise an error in eager mode is accepted and returned unchanged.\n\n### Repro\n```python\nimport torch",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 91468,
+      "title": "torch.compile incorrect when imperative autograd APIs are used",
+      "url": "https://github.com/pytorch/pytorch/issues/91468",
+      "state": "open",
+      "labels": [
+        "module: autograd",
+        "triaged",
+        "module: correctness (silent)",
+        "months",
+        "oncall: pt2",
+        "module: aotdispatch",
+        "module: pt2-dispatcher",
+        "no-scrub"
+      ],
+      "created_at": "2022-12-28T21:54:17Z",
+      "updated_at": "2026-03-18T21:56:26Z",
+      "comments": 8,
+      "reactions": 0,
+      "categories": [
+        "numerical_accuracy"
+      ],
+      "apis": [
+        "torch.allclose",
+        "torch.autograd.grad",
+        "torch.compile",
+        "torch.randn",
+        "torch.tensor"
+      ],
+      "has_repro": true,
+      "body_excerpt": "## Issue description\n\ntorch.compile may be silently incorrect when Tensor.retain_grad or Tensor.register_hook are involved.\n\n## Code example\n\nExample with retain_grad:\n```py",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 172711,
+      "title": "torch.compile produces wrong output channels for mkldnn._convolution_transpose_pointwise (FakeTensor shape inference bug) ",
+      "url": "https://github.com/pytorch/pytorch/issues/172711",
+      "state": "open",
+      "labels": [
+        "module: correctness (silent)",
+        "oncall: pt2",
+        "oncall: cpu inductor",
+        "topic: fuzzer"
+      ],
+      "created_at": "2026-01-17T04:32:56Z",
+      "updated_at": "2026-01-21T17:22:19Z",
+      "comments": 5,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch",
+        "numerical_accuracy"
+      ],
+      "apis": [
+        "torch._dynamo.config.repro_tolerance",
+        "torch._dynamo.utils",
+        "torch._dynamo.utils.same",
+        "torch._inductor.config.fallback_random",
+        "torch.add",
+        "torch.clamp_max",
+        "torch.clamp_min",
+        "torch.compile",
+        "torch.div",
+        "torch.float32",
+        "torch.manual_seed",
+        "torch.nn",
+        "torch.no_grad",
+        "torch.ops.mkldnn._convolution_transpose_pointwise.default",
+        "torch.randn",
+        "torch.set_num_threads"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n### Summary\ntorch.compile produces an incorrect output tensor shape when compiling a model that uses torch.ops.mkldnn._convolution_transpose_pointwise.default. The compiled model outputs a tensor with the wrong number of channels compared to eager mode execution.\n\nThis is a silent correctness bug\u2014the compiled model runs without error but produces wrong results, which is particularly dangerous in production environments.\n\n### Root Cause Analysis",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 172183,
+      "title": "\ud83d\udc1b torch.compile silently bypasses dtype mismatch checks in SFDP attention patterns",
+      "url": "https://github.com/pytorch/pytorch/issues/172183",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "module: meta tensors",
+        "oncall: pt2",
+        "topic: fuzzer"
+      ],
+      "created_at": "2026-01-11T06:01:00Z",
+      "updated_at": "2026-01-12T02:39:01Z",
+      "comments": 4,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch.Size",
+        "torch.compile",
+        "torch.dropout",
+        "torch.float16",
+        "torch.float32",
+        "torch.manual_seed",
+        "torch.nn",
+        "torch.no_grad",
+        "torch.randn",
+        "torch.softmax"
+      ],
+      "has_repro": true,
+      "body_excerpt": "`torch.compile` silently bypasses dtype mismatch checks in attention computations, while eager mode correctly raises a `RuntimeError`. This allows code with `float16 @ float32` matrix multiplication to execute silently in compiled mode, potentially producing incorrect numerical results.\n\nWhen performing attention computations that involve explicit dtype conversions (e.g., converting attention weights to `float16` while keeping values in `float32`), eager mode correctly detects the type mismatch and raises an error. However, `torch.compile` bypasses this safety check and executes the operation ",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 173054,
+      "title": "[Inconsistency] TorchInductor produces incorrect result for aten.hardswish_backward followed by aten.add",
+      "url": "https://github.com/pytorch/pytorch/issues/173054",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "oncall: pt2",
+        "module: inductor"
+      ],
+      "created_at": "2026-01-22T05:10:16Z",
+      "updated_at": "2026-01-27T19:42:16Z",
+      "comments": 4,
+      "reactions": 0,
+      "categories": [
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch.bfloat16",
+        "torch.compile",
+        "torch.ops.aten.hardswish_backward",
+        "torch.randn",
+        "torch.testing.assert_close"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nWhen compiling a function with `torch.compile`, `TorchInductor` produces results that differ from the `eager` backend when an `aten.add` operation is applied after `aten.hardswish_backward`. The inconsistency only occurs when the addition is present; removing it restores correct behavior.\n\n### Reproduction Script\n```\nimport torch\n",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 171191,
+      "title": "torch.compile (Inductor) ignores float64\u2192float32 dtype promotion in SDPA, diverging from eager semantics",
+      "url": "https://github.com/pytorch/pytorch/issues/171191",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "oncall: pt2",
+        "topic: fuzzer",
+        "module: sdpa"
+      ],
+      "created_at": "2025-12-23T16:00:32Z",
+      "updated_at": "2026-01-11T07:22:49Z",
+      "comments": 3,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch.Size",
+        "torch.bmm",
+        "torch.compile",
+        "torch.float32",
+        "torch.float64",
+        "torch.half",
+        "torch.manual_seed",
+        "torch.nn",
+        "torch.nn.functional",
+        "torch.no_grad",
+        "torch.randint",
+        "torch.randn"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n# \ud83d\udc1b Describe the bug\n\n`torch.compile` with Inductor backend produces different behavior than eager mode when explicit dtype conversions from `float64` to `float32` exist in scaled dot-product attention patterns. The eager mode raises a dtype mismatch error, but the compiled version executes successfully.\n\nThis is a variant of the SFDP type conversion semantic inconsistency where `float64` attention masks interact incorrectly with `float32` attention weights.\n",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 170688,
+      "title": "[BUG][Inconsistency]Numerical mismatch between eager and inductor for aten.__interpolate",
+      "url": "https://github.com/pytorch/pytorch/issues/170688",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "oncall: pt2",
+        "module: inductor",
+        "pt2: numerics-discrepancy"
+      ],
+      "created_at": "2025-12-17T16:38:37Z",
+      "updated_at": "2025-12-19T12:54:09Z",
+      "comments": 3,
+      "reactions": 0,
+      "categories": [
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch.bfloat16",
+        "torch.compile",
+        "torch.ops.aten.__interpolate",
+        "torch.randn",
+        "torch.testing.assert_close"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n```python\nimport torch\n\ndef model_func(input, size, scale_factor, mode, align_corners, recompute_scale_factor, antialias):\n    out = torch.ops.aten.__interpolate(input, size=size,scale_factor=scale_factor,mode=mode,align_corners=align_corners,recompute_scale_factor=recompute_scale_factor,antialias=antialias,)\n    return out",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 149314,
+      "title": "Inductor Incorrectly Handles `torch.view_copy` When Changing dtype",
+      "url": "https://github.com/pytorch/pytorch/issues/149314",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "module: viewing and reshaping",
+        "module: python frontend",
+        "module: edge cases",
+        "oncall: pt2",
+        "topic: fuzzer"
+      ],
+      "created_at": "2025-03-17T12:06:54Z",
+      "updated_at": "2025-03-18T06:42:42Z",
+      "comments": 3,
+      "reactions": 0,
+      "categories": [
+        "jit_eager_mismatch",
+        "numerical_accuracy"
+      ],
+      "apis": [
+        "torch.arange",
+        "torch.compile",
+        "torch.float32",
+        "torch.float64",
+        "torch.view_copy"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n~The `torch.view_copy` function produces incorrect results in Eager mode when changing the `dtype` of a tensor. However, when using `torch.compile` (Inductor), the results are correct. This suggests a potential bug in the Eager implementation of `torch.view_copy`.~\n\nCompile causes wrong answer in this corner case:\n\n```python\nimport torch",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 108670,
+      "title": "torch.jit.script produces incorrect gradients",
+      "url": "https://github.com/pytorch/pytorch/issues/108670",
+      "state": "open",
+      "labels": [
+        "oncall: jit"
+      ],
+      "created_at": "2023-09-06T17:19:07Z",
+      "updated_at": "2023-09-07T01:17:37Z",
+      "comments": 3,
+      "reactions": 0,
+      "categories": [
+        "numerical_accuracy"
+      ],
+      "apis": [
+        "torch.abs",
+        "torch.autograd.grad",
+        "torch.compile",
+        "torch.jit.script",
+        "torch.nn",
+        "torch.ones",
+        "torch.randn",
+        "torch.sqrt"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nI made a custom layer-norm implementation for Conv1d `(B, C, L)` ordering, and the gradients appear to be wrong under `torch.jit.script`. \n\nHere is a reproducible example:\n```python\nimport torch\nimport torch.nn as nn",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 178096,
+      "title": "torch.compile(dynamic=True) on CUDA: large eager vs compiled mismatch for BatchNorm2d + Conv2d",
+      "url": "https://github.com/pytorch/pytorch/issues/178096",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "oncall: pt2",
+        "module: inductor",
+        "module: pt2 accuracy",
+        "bot-triaged"
+      ],
+      "created_at": "2026-03-22T16:33:19Z",
+      "updated_at": "2026-03-24T17:41:57Z",
+      "comments": 2,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch.Tensor",
+        "torch.backends.cudnn.benchmark",
+        "torch.backends.cudnn.deterministic",
+        "torch.compile",
+        "torch.device",
+        "torch.float32",
+        "torch.is_tensor",
+        "torch.isfinite",
+        "torch.manual_seed",
+        "torch.nn",
+        "torch.no_grad",
+        "torch.randn",
+        "torch.where",
+        "torch.zeros_like"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nA minimal module BatchNorm2d(96) \u2192 Conv2d(96\u2192256, k=5, p=2) in eval mode on CUDA shows a large output gap between eager and torch.compile(..., dynamic=True) on the conv2 output. Max per-element relative error vs eager is ~9.5\u00d710\u207b\u00b2, while tight float agreement would be ~1\u00d710\u207b\u2077 (same order as 1.19e-7).\n\nRepro: Fixed random seed; random float32 input (4, 96, 8, 8) on CPU then moved to CUDA; random state_dict for bn1.* and conv2.*; compare eager forward to compiled forward with the same x and sd (two module instances).\n\nExpected: Compiled output matches eager within a small",
+      "reproduction_class": [
+        "compiler_vs_eager",
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 175953,
+      "title": "`torch.set_default_device` are ignored by `torch.compile`",
+      "url": "https://github.com/pytorch/pytorch/issues/175953",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "oncall: pt2",
+        "module: dynamo",
+        "bot-triaged"
+      ],
+      "created_at": "2026-02-27T07:36:58Z",
+      "updated_at": "2026-03-03T11:42:28Z",
+      "comments": 2,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch._dynamo.exc.TorchRuntimeError",
+        "torch.compile",
+        "torch.cuda.is_available",
+        "torch.nn",
+        "torch.py",
+        "torch.randn",
+        "torch.set_default_device",
+        "torch.tensor"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nWhen `torch.set_default_device(\"cuda\")` is set globally, `torch.tensor(...)` correctly creates tensors on CUDA in eager mode. However, under torch.compile, Dynamo's `FakeTensor` tracing ignores the global default device and creates the tensor on CPU instead, causing a device mismatch error that never occurs in eager mode.\n\n```python\nimport torch\nimport torch.nn as nn\n",
+      "reproduction_class": [
+        "compiler_vs_eager",
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 174371,
+      "title": "[inductor][aot_eager] Incorrect results with torch.compile when using clone, as_strided followed by add_",
+      "url": "https://github.com/pytorch/pytorch/issues/174371",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "module: functionalization",
+        "oncall: pt2",
+        "module: pt2-dispatcher"
+      ],
+      "created_at": "2026-02-05T09:58:32Z",
+      "updated_at": "2026-02-16T09:31:33Z",
+      "comments": 2,
+      "reactions": 0,
+      "categories": [
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch._inductor.config.fallback_random",
+        "torch.compile",
+        "torch.manual_seed",
+        "torch.randn",
+        "torch.testing.assert_close"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nHere is the code to reproduce the bug:\n\n```python\nimport torch\ntorch._inductor.config.fallback_random = True\n",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 173052,
+      "title": "[Inconsistency] aten.linalg_pinv returns inconsistent output shape between eager and inductor",
+      "url": "https://github.com/pytorch/pytorch/issues/173052",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "oncall: pt2",
+        "module: fakeTensor",
+        "module: decompositions",
+        "module: pt2-dispatcher"
+      ],
+      "created_at": "2026-01-22T04:24:57Z",
+      "updated_at": "2026-01-29T10:50:06Z",
+      "comments": 2,
+      "reactions": 0,
+      "categories": [
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch.Size",
+        "torch.compile",
+        "torch.float64",
+        "torch.ops.aten.linalg_pinv",
+        "torch.randn",
+        "torch.testing.assert_close"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n\nWhen using `torch.compile` with `aten.linalg_pinv`, the output shape differs between the `eager` and `inductor` backends if rcond is provided as a tensor. This causes a shape mismatch and fails correctness checks.\n\n### Reproduction Script\n\n",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 166514,
+      "title": "Inductor Fails with Stride Mismatch for `torch.fft.ifft` Due to Incorrect Meta Kernel Implementation",
+      "url": "https://github.com/pytorch/pytorch/issues/166514",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "oncall: pt2",
+        "module: inductor"
+      ],
+      "created_at": "2025-10-29T11:44:39Z",
+      "updated_at": "2025-11-13T15:39:49Z",
+      "comments": 2,
+      "reactions": 0,
+      "categories": [
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch.Size",
+        "torch.compile",
+        "torch.fft.ifft",
+        "torch.library.opcheck",
+        "torch.nn",
+        "torch.ops.aten._fft_r2c.default",
+        "torch.randn",
+        "torch.real"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nWhen compiling a model containing `torch.fft.ifft` operations with `torch.compile(backend=\"inductor\")`, a stride validation error occurs due to an incorrect fake (meta) kernel implementation. The identical model works correctly with `eager` and `aot_eager` backends.\n\n### To reproduce\n```python\nimport torch\nimport torch.nn as nn",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 177630,
+      "title": "`torch.compile(backend=\"inductor\")` silently succeeds on `torch.matmul` (\u22653D) with mismatched dtypes (float16 @ float32) where eager raises RuntimeError",
+      "url": "https://github.com/pytorch/pytorch/issues/177630",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "module: type promotion",
+        "module: half",
+        "module: meta tensors",
+        "oncall: pt2",
+        "module: inductor",
+        "matrix multiplication",
+        "topic: fuzzer",
+        "bot-triaged"
+      ],
+      "created_at": "2026-03-17T08:56:32Z",
+      "updated_at": "2026-03-26T15:54:10Z",
+      "comments": 1,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch._dynamo.reset",
+        "torch._inductor.fx_passes.fuse_attention",
+        "torch.bmm",
+        "torch.compile",
+        "torch.float16",
+        "torch.float32",
+        "torch.long",
+        "torch.matmul",
+        "torch.mm",
+        "torch.nn",
+        "torch.randint",
+        "torch.randn",
+        "torch.softmax"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n\n`torch.compile(backend=\"inductor\")` silently succeeds when executing `torch.matmul` with \u22653D inputs of mismatched dtypes (`float16` and `float32`), while **eager mode correctly raises `RuntimeError: expected scalar type Half but found Float`**.\n\nThe compiled result is a `float32` tensor numerically identical to the result of explicitly casting the `float16` input to `float32` first \u2014 confirming Inductor performs an **implicit dtype promotion** that bypasses the strict same-dtype constraint of the eager kernels.\n\n**This is NOT a timeout or numerical precision issue** \u2014 ",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 177629,
+      "title": "`torch.compile(backend=\"inductor\")` silently succeeds on `torch.bmm` with mismatched dtypes (float16 @ float32) where eager raises RuntimeError",
+      "url": "https://github.com/pytorch/pytorch/issues/177629",
+      "state": "open",
+      "labels": [
+        "module: error checking",
+        "triaged",
+        "module: type promotion",
+        "module: half",
+        "module: meta tensors",
+        "oncall: pt2",
+        "module: decompositions",
+        "module: inductor",
+        "matrix multiplication",
+        "topic: fuzzer",
+        "bot-triaged"
+      ],
+      "created_at": "2026-03-17T08:49:58Z",
+      "updated_at": "2026-03-23T23:28:38Z",
+      "comments": 1,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch._dynamo.reset",
+        "torch._inductor.fx_passes.fuse_attention",
+        "torch.bmm",
+        "torch.compile",
+        "torch.float16",
+        "torch.float32",
+        "torch.mm",
+        "torch.randn"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n\n`torch.compile(backend=\"inductor\")` silently succeeds when executing `torch.bmm` with mismatched input dtypes (`float16` and `float32`), while **eager mode correctly raises `RuntimeError: expected scalar type Half but found Float`**.\n\nThe compiled result is a `float32` tensor that is numerically identical to the result of explicitly casting the `float16` input to `float32` first (i.e., `torch.bmm(a.float(), b)`) \u2014 confirming that Inductor performs an **implicit dtype promotion** that bypasses the strict same-dtype constraint enforced by the eager CUDA/CPU kernels.\n\n**T",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 172184,
+      "title": "\ud83d\udc1b torch.compile silently bypasses device mismatch checks with torch.randperm() in index_add operations",
+      "url": "https://github.com/pytorch/pytorch/issues/172184",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "module: meta tensors",
+        "oncall: pt2",
+        "topic: fuzzer"
+      ],
+      "created_at": "2026-01-11T06:01:15Z",
+      "updated_at": "2026-01-12T02:35:16Z",
+      "comments": 1,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch",
+        "numerical_accuracy"
+      ],
+      "apis": [
+        "torch.Size",
+        "torch.compile",
+        "torch.index_add",
+        "torch.manual_seed",
+        "torch.nn",
+        "torch.nn.functional",
+        "torch.no_grad",
+        "torch.randn",
+        "torch.randperm"
+      ],
+      "has_repro": true,
+      "body_excerpt": "`torch.compile` silently bypasses device mismatch checks when using `torch.randperm()` with CUDA tensors in `index_add` operations. Eager mode correctly raises a `RuntimeError` about tensors being on different devices, but compiled mode executes silently.\n\nWhen `torch.randperm()` is called without specifying a device, it creates a CPU tensor by default. Using this CPU index tensor with CUDA tensors in `torch.index_add()` should raise an error, and does so in eager mode. However, `torch.compile` bypasses this safety check.\n\n## Minimal Reproducer\n\n```python\nimport torch",
+      "reproduction_class": [
+        "compiler_vs_eager",
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 181266,
+      "title": "[inductor] CPP kernel AssertionError: unexpected group: ((12, 14, 10), ()) != (168, 10), () when flatten followed by BatchNorm1d compiled on CPU",
+      "url": "https://github.com/pytorch/pytorch/issues/181266",
+      "state": "open",
+      "labels": [
+        "triage review",
+        "oncall: pt2",
+        "module: inductor",
+        "oncall: cpu inductor",
+        "bot-triaged"
+      ],
+      "created_at": "2026-04-23T18:44:18Z",
+      "updated_at": "2026-04-23T18:48:46Z",
+      "comments": 0,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch._inductor.exc.InductorError",
+        "torch.clamp",
+        "torch.compile",
+        "torch.exp",
+        "torch.flatten",
+        "torch.manual_seed",
+        "torch.nn",
+        "torch.nn.Module",
+        "torch.nn.functional",
+        "torch.nn.functional.batch_norm",
+        "torch.nn.functional.instance_norm",
+        "torch.nn.functional.rrelu",
+        "torch.randn"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nTorchInductor crashes during compilation with an ```AssertionError: unexpected group``` when running a model that applies flatten followed by elementwise ops and BatchNorm1d.\nThe failure happens in the C++ codegen stage with a shape grouping mismatch:\n```((12, 14, 10), ()) != (168, 10), ()```\nEven though the FX graph shows the tensor flattened to shape [12, 140] before BatchNorm1d, Inductor appears to incorrectly group dimensions during scheduling/codegen.\n\n```python",
+      "reproduction_class": [
+        "compiler_vs_eager",
+        "crash_or_internal_error"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 180807,
+      "title": "[inductor][static launcher] Missing runtime dtype validation for pointer-typed Triton args can silently produce incorrect results",
+      "url": "https://github.com/pytorch/pytorch/issues/180807",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "module: correctness (silent)",
+        "oncall: pt2",
+        "module: inductor",
+        "bot-triaged"
+      ],
+      "created_at": "2026-04-20T05:06:15Z",
+      "updated_at": "2026-04-21T17:41:55Z",
+      "comments": 0,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "numerical_accuracy"
+      ],
+      "apis": [
+        "torch.Tensor",
+        "torch.allclose",
+        "torch.bfloat16",
+        "torch.compile",
+        "torch.cuda.synchronize",
+        "torch.empty_like",
+        "torch.float32",
+        "torch.library.custom_op",
+        "torch.manual_seed",
+        "torch.ops.custom_ops.bad_meta_mul",
+        "torch.randn"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n\nI believe there is a missing runtime validation in the static Triton launcher path for pointer-typed Triton kernel arguments.\n\nI reproduced this on a pip-installed `torch==2.8.0` environment (not running from a source checkout). In that version, the relevant file on the executed code path is:\n- `torch/_inductor/runtime/static_cuda_launcher.py`\n",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 175600,
+      "title": "[Inductor][PrivateUse1]: Stride mismatch in constant_pad_nd between privateuse1 and native aten implementation",
+      "url": "https://github.com/pytorch/pytorch/issues/175600",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "module: padding",
+        "module: meta tensors",
+        "oncall: pt2",
+        "module: inductor",
+        "module: PrivateUse1",
+        "bot-triaged"
+      ],
+      "created_at": "2026-02-24T02:07:27Z",
+      "updated_at": "2026-03-23T23:16:34Z",
+      "comments": 0,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "torch._check",
+        "torch._dynamo.config",
+        "torch._dynamo.config.suppress_errors",
+        "torch._dynamo.repro.after_aot",
+        "torch._dynamo.testing",
+        "torch._functorch.config",
+        "torch._functorch.config.debug_partitioner",
+        "torch._functorch.config.enable_autograd_cache",
+        "torch._functorch.config.fake_tensor_allow_unsafe_data_ptr_access",
+        "torch._functorch.config.functionalize_rng_ops",
+        "torch._functorch.config.unlift_effect_tokens",
+        "torch._inductor.config",
+        "torch._inductor.config.alignment_asserts",
+        "torch._inductor.config.allow_buffer_reuse",
+        "torch._inductor.config.autotune_fallback_to_aten",
+        "torch._inductor.config.combo_kernels_autotune",
+        "torch._inductor.config.comprehensive_padding",
+        "torch._inductor.config.fallback_random",
+        "torch._inductor.config.fx_graph_cache",
+        "torch._inductor.config.inplace_buffers",
+        "torch._inductor.config.layout_optimization",
+        "torch._inductor.config.max_autotune_gemm_backends",
+        "torch._inductor.config.max_fusion_size",
+        "torch._inductor.config.size_asserts",
+        "torch._inductor.config.split_reductions",
+        "torch._inductor.config.trace.enabled",
+        "torch._inductor.config.trace.save_real_tensors",
+        "torch._inductor.config.triton.codegen_upcast_to_fp32",
+        "torch._inductor.config.triton.cudagraphs",
+        "torch._inductor.config.triton.divisible_by_16",
+        "torch._inductor.config.triton.max_tiles",
+        "torch._inductor.config.triton.persistent_reductions",
+        "torch._inductor.config.triton.prefer_nd_tiling",
+        "torch._inductor.config.triton.store_cubin",
+        "torch._inductor.config.triton.unique_kernel_names",
+        "torch._inductor.config.triton.use_block_ptr",
+        "torch._inductor.config.unroll_reductions_threshold",
+        "torch._inductor.inductor_prims",
+        "torch.bfloat16",
+        "torch.empty",
+        "torch.float32",
+        "torch.fx",
+        "torch.fx.experimental._config",
+        "torch.library.opcheck",
+        "torch.nn",
+        "torch.nn.Module",
+        "torch.no_grad",
+        "torch.ops.aten.constant_pad_nd.default",
+        "torch.ops.aten.convolution_backward.default",
+        "torch.ops.aten.slice.Tensor",
+        "torch.ops.aten.upsample_bilinear2d_backward.default",
+        "torch.ops.prims.convert_element_type.default"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nI'm encountering a stride mismatch error when running a compiled model with constant_pad_nd operation. The error occurs during the execution of the generated inductor code:\n```\nW0224 09:29:19.873000 1093123 pytorch_29/venv/pytorch/lib/python3.10/site-packages/torch/_dynamo/debug_utils.py:591] no save_dir specified, will generate random data\n33.3%W0224 09:29:19.874000 1093123 pytorch_29/venv/pytorch/lib/python3.10/site-packages/torch/_dynamo/debug_utils.py:620] could not load None, generating random data instead\n66.7%W0224 09:29:19.899000 1093123 pytorch_29/venv/pytorch/",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 179593,
+      "title": "`torch.compile` fails on `torch.istft` while eager succeeds with warning only (`length` handling mismatch in fake/meta execution)",
+      "url": "https://github.com/pytorch/pytorch/issues/179593",
+      "state": "open",
+      "labels": [
+        "module: error checking",
+        "triaged"
+      ],
+      "created_at": "2026-04-07T16:00:45Z",
+      "updated_at": "2026-04-15T14:50:39Z",
+      "comments": 0,
+      "reactions": 0,
+      "categories": [
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch.__version__",
+        "torch._dynamo.exc.TorchRuntimeError",
+        "torch.compile",
+        "torch.hann_window",
+        "torch.istft",
+        "torch.nn",
+        "torch.randn",
+        "torch.view_as_complex"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n### Summary\n\n`torch.istft` behaves differently in eager mode vs `torch.compile` tracing.\n\nWith the repro below:\n",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 178040,
+      "title": "`torch.compile` raises RuntimeError on valid `torch.addmm` with shape mismatch where eager succeeds",
+      "url": "https://github.com/pytorch/pytorch/issues/178040",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "module: linear algebra",
+        "oncall: pt2",
+        "module: inductor",
+        "topic: fuzzer",
+        "bot-triaged"
+      ],
+      "created_at": "2026-03-21T07:54:29Z",
+      "updated_at": "2026-03-21T07:57:50Z",
+      "comments": 0,
+      "reactions": 0,
+      "categories": [
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch._dynamo.reset",
+        "torch.addmm",
+        "torch.compile",
+        "torch.long",
+        "torch.nn",
+        "torch.nn.functional",
+        "torch.no_grad",
+        "torch.randint",
+        "torch.randn",
+        "torch.softmax",
+        "torch.tanh",
+        "torch.zeros"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n\n`torch.compile` raises `RuntimeError: The size of tensor a (512) must match the size of tensor b (10000) at non-singleton dimension 1` on a valid `torch.addmm` call that **eager mode executes successfully**. This is a **compile regression** \u2014 the model runs fine in eager mode but fails under compilation.\n\nThe root cause is a `torch.addmm(bias, input, weight.t(), beta=0.0, alpha=0.1)` call where the `bias` tensor has a wrong size (`d_model=512` instead of `vocab_size=10000`), but in eager mode `beta=0.0` causes the bias term to be zeroed out, making its shape irrelevant",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 176957,
+      "title": "`_make_wrapper_subclass` + `__torch_dispatch__` fails under `torch.compile` + `torch.vmap` with cross-device storage error",
+      "url": "https://github.com/pytorch/pytorch/issues/176957",
+      "state": "open",
+      "labels": [
+        "module: cuda",
+        "triaged",
+        "module: __torch_dispatch__",
+        "oncall: pt2",
+        "module: functorch",
+        "module: pt2-dispatcher",
+        "dynamo-functorch",
+        "bot-triaged"
+      ],
+      "created_at": "2026-03-10T00:38:05Z",
+      "updated_at": "2026-03-10T00:40:58Z",
+      "comments": 0,
+      "reactions": 0,
+      "categories": [
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch.Tensor",
+        "torch.Tensor._make_wrapper_subclass",
+        "torch._C._disabled_torch_function_impl",
+        "torch._subclasses.fake_tensor.FakeTensorConverter.from_real_tensor",
+        "torch._subclasses.meta_utils.empty_create_subclass",
+        "torch.as_tensor",
+        "torch.compile",
+        "torch.randn",
+        "torch.strided",
+        "torch.tensor",
+        "torch.vmap"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nA transparent tensor subclass implemented with `_make_wrapper_subclass` + `__torch_dispatch__` + `__tensor_flatten__`/`__tensor_unflatten__` triggers a device mismatch error when used as a non-batched input to `torch.vmap` inside a `torch.compile(fullgraph=True)` region on CUDA:\n\n```\nRuntimeError: Attempted to set the storage of a tensor on device \"cuda:0\"\nto a storage on different device \"meta\".\n```",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 141017,
+      "title": "multilabel_margin_loss gives incorrect results in torch.compile",
+      "url": "https://github.com/pytorch/pytorch/issues/141017",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "oncall: pt2",
+        "module: pt2 accuracy"
+      ],
+      "created_at": "2024-11-19T12:02:02Z",
+      "updated_at": "2024-11-22T02:54:54Z",
+      "comments": 0,
+      "reactions": 0,
+      "categories": [
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch.bool",
+        "torch.compile",
+        "torch.float32",
+        "torch.multinomial",
+        "torch.nn.functional.multilabel_margin_loss",
+        "torch.nn.functional.one_hot",
+        "torch.rand",
+        "torch.randint",
+        "torch.testing.assert_close",
+        "torch.where"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nGot different results when running compiled version of torch.nn.functional.multilabel_margin_loss.\n\nReproducer:\n\n```\nimport torch",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 116258,
+      "title": "Major gradient mismatch (max diff ~0.42) on multi-branch WDAG topologies with jit_compile=True",
+      "url": "https://github.com/tensorflow/tensorflow/issues/116258",
+      "state": "open",
+      "labels": [
+        "type:bug",
+        "comp:ops",
+        "comp:xla",
+        "TF 2.16"
+      ],
+      "created_at": "2026-04-18T09:07:08Z",
+      "updated_at": "2026-04-21T07:17:47Z",
+      "comments": 2,
+      "reactions": 0,
+      "categories": [
+        "tf_function_mismatch"
+      ],
+      "apis": [
+        "tf.GradientTape",
+        "tf.cast",
+        "tf.float32",
+        "tf.function",
+        "tf.keras.Model",
+        "tf.keras.layers.Concatenate",
+        "tf.keras.layers.Conv1D",
+        "tf.keras.layers.Dense",
+        "tf.keras.layers.Flatten",
+        "tf.reduce_mean"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nNo\n",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 105131,
+      "title": "[XLA/GPU] ConcatV2 op kernel constraint mismatch when using jit_compile=True with Python control flow",
+      "url": "https://github.com/tensorflow/tensorflow/issues/105131",
+      "state": "open",
+      "labels": [
+        "type:bug",
+        "comp:xla",
+        "TF 2.19"
+      ],
+      "created_at": "2025-11-26T11:55:29Z",
+      "updated_at": "2025-12-01T05:40:23Z",
+      "comments": 1,
+      "reactions": 0,
+      "categories": [
+        "tf_function_mismatch"
+      ],
+      "apis": [
+        "tf.Tensor",
+        "tf.concat",
+        "tf.function",
+        "tf.keras.Model",
+        "tf.keras.layers.Dense",
+        "tf.nn.sigmoid",
+        "tf.ones_like",
+        "tf.random.normal",
+        "tf.reduce_sum"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nNo\n",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 102043,
+      "title": "Incorrect result when using XLA (jit_compile=True) with tf.math.reduce_mean on int32 tensors",
+      "url": "https://github.com/tensorflow/tensorflow/issues/102043",
+      "state": "open",
+      "labels": [
+        "type:bug",
+        "comp:xla",
+        "awaiting PR merge",
+        "TF 2.19"
+      ],
+      "created_at": "2025-10-10T12:53:44Z",
+      "updated_at": "2025-10-16T06:17:55Z",
+      "comments": 1,
+      "reactions": 0,
+      "categories": [
+        "numerical_accuracy"
+      ],
+      "apis": [
+        "tf.function",
+        "tf.math.reduce_mean"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "compiler_vs_eager"
+      ]
+    }
+  ],
+  "cpu_vs_gpu": [
+    {
+      "repo": "pytorch/pytorch",
+      "number": 52241,
+      "title": "CTCLoss gradient is incorrect",
+      "url": "https://github.com/pytorch/pytorch/issues/52241",
+      "state": "open",
+      "labels": [
+        "module: docs",
+        "module: autograd",
+        "module: loss",
+        "triaged"
+      ],
+      "created_at": "2021-02-12T21:55:23Z",
+      "updated_at": "2026-04-20T22:17:26Z",
+      "comments": 31,
+      "reactions": 2,
+      "categories": [
+        "gradient_mismatch",
+        "numerical_accuracy"
+      ],
+      "apis": [
+        "torch.autograd.gradcheck",
+        "torch.nn",
+        "torch.randn",
+        "torch.tensor"
+      ],
+      "has_repro": true,
+      "body_excerpt": "## \ud83d\udc1b Bug\nHi,\n\nWhile working on some CTC extensions, I noticed that torch's CTCLoss was computing incorrect gradient. At least when using CPU (I have not tested on GPU yet). I observed this problem on both pytorch 1.3 and pytorch 1.7.1 , using MacOS/anaconda distribution.\n\n## To Reproduce\nTorch's own gradcheck tool detect this problem. Here is a minimal example of gradient computation going wrong (for the record, it is not a problem of precision with gradcheck. The computed gradient is really wrong.\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 162235,
+      "title": "Inconsistent handling of `-0.0` between CPU and CUDA for many operators",
+      "url": "https://github.com/pytorch/pytorch/issues/162235",
+      "state": "open",
+      "labels": [
+        "module: cuda",
+        "triaged",
+        "module: NaNs and Infs",
+        "module: edge cases"
+      ],
+      "created_at": "2025-09-05T02:09:04Z",
+      "updated_at": "2025-10-20T01:36:26Z",
+      "comments": 12,
+      "reactions": 0,
+      "categories": [
+        "numerical_accuracy"
+      ],
+      "apis": [
+        "torch.amax",
+        "torch.amin",
+        "torch.argsort",
+        "torch.device",
+        "torch.float32",
+        "torch.maximum",
+        "torch.nn.functional",
+        "torch.sort",
+        "torch.tensor"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nSimilar to [#114569](https://github.com/pytorch/pytorch/issues/114569), there are additional operators that show inconsistent handling of negative zero (-0.0) between CPU and CUDA.\nOn CPU these ops often preserve the -0.0 sign bit, while on CUDA they normalize it to +0.0 or change ordering in comparisons.\n```python\nimport torch\nimport torch.nn.functional as F\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 177116,
+      "title": "MPS: catastrophically wrong gradients in backward pass (>32K elements)",
+      "url": "https://github.com/pytorch/pytorch/issues/177116",
+      "state": "open",
+      "labels": [
+        "high priority",
+        "needs reproduction",
+        "module: autograd",
+        "triaged",
+        "module: mps",
+        "bot-triaged"
+      ],
+      "created_at": "2026-03-11T04:53:55Z",
+      "updated_at": "2026-04-17T08:49:56Z",
+      "comments": 7,
+      "reactions": 0,
+      "categories": [
+        "numerical_accuracy"
+      ],
+      "apis": [
+        "torch.bmm",
+        "torch.manual_seed",
+        "torch.mm",
+        "torch.mps.empty_cache",
+        "torch.nn",
+        "torch.randint"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nThe MPS backend produces catastrophically wrong gradients (1,000x\u2013100,000x too large) during `loss.backward()` when:\n\n1. A prior MPS forward+backward pass has occurred in the same process at a **different batch size**, and\n2. The total number of elements (batch_size \u00d7 seq_len) exceeds **~32,768 (2^15)**.\n\nThe forward pass is always correct \u2014 loss values match CPU within float32 tolerance. Only the backward pass is affected. Without the prior MPS operation at a different shape, gradients are correct. In some quick experimentation, `torch.mps.empty_cache()` between calls ",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 178096,
+      "title": "torch.compile(dynamic=True) on CUDA: large eager vs compiled mismatch for BatchNorm2d + Conv2d",
+      "url": "https://github.com/pytorch/pytorch/issues/178096",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "oncall: pt2",
+        "module: inductor",
+        "module: pt2 accuracy",
+        "bot-triaged"
+      ],
+      "created_at": "2026-03-22T16:33:19Z",
+      "updated_at": "2026-03-24T17:41:57Z",
+      "comments": 2,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch.Tensor",
+        "torch.backends.cudnn.benchmark",
+        "torch.backends.cudnn.deterministic",
+        "torch.compile",
+        "torch.device",
+        "torch.float32",
+        "torch.is_tensor",
+        "torch.isfinite",
+        "torch.manual_seed",
+        "torch.nn",
+        "torch.no_grad",
+        "torch.randn",
+        "torch.where",
+        "torch.zeros_like"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nA minimal module BatchNorm2d(96) \u2192 Conv2d(96\u2192256, k=5, p=2) in eval mode on CUDA shows a large output gap between eager and torch.compile(..., dynamic=True) on the conv2 output. Max per-element relative error vs eager is ~9.5\u00d710\u207b\u00b2, while tight float agreement would be ~1\u00d710\u207b\u2077 (same order as 1.19e-7).\n\nRepro: Fixed random seed; random float32 input (4, 96, 8, 8) on CPU then moved to CUDA; random state_dict for bn1.* and conv2.*; compare eager forward to compiled forward with the same x and sd (two module instances).\n\nExpected: Compiled output matches eager within a small",
+      "reproduction_class": [
+        "compiler_vs_eager",
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 175953,
+      "title": "`torch.set_default_device` are ignored by `torch.compile`",
+      "url": "https://github.com/pytorch/pytorch/issues/175953",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "oncall: pt2",
+        "module: dynamo",
+        "bot-triaged"
+      ],
+      "created_at": "2026-02-27T07:36:58Z",
+      "updated_at": "2026-03-03T11:42:28Z",
+      "comments": 2,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch._dynamo.exc.TorchRuntimeError",
+        "torch.compile",
+        "torch.cuda.is_available",
+        "torch.nn",
+        "torch.py",
+        "torch.randn",
+        "torch.set_default_device",
+        "torch.tensor"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nWhen `torch.set_default_device(\"cuda\")` is set globally, `torch.tensor(...)` correctly creates tensors on CUDA in eager mode. However, under torch.compile, Dynamo's `FakeTensor` tracing ignores the global default device and creates the tensor on CPU instead, causing a device mismatch error that never occurs in eager mode.\n\n```python\nimport torch\nimport torch.nn as nn\n",
+      "reproduction_class": [
+        "compiler_vs_eager",
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 178756,
+      "title": "Case mismatch in `_new_process_group_helper` prevents default backend type from being set for custom out-of-tree backends",
+      "url": "https://github.com/pytorch/pytorch/issues/178756",
+      "state": "open",
+      "labels": [
+        "oncall: distributed",
+        "bot-triaged"
+      ],
+      "created_at": "2026-03-30T09:04:43Z",
+      "updated_at": "2026-03-30T10:57:33Z",
+      "comments": 1,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n## Bug Description\n\nWhen creating a process group with a multi-backend string that includes a custom out-of-tree backend (e.g., `\"cpu:gloo,cuda:mybackend\"`), the default backend type is never set to `CUSTOM`. This causes `hasHooks()` to fail during process group destruction because it cannot find the default backend.\n\n## Root Cause\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 172184,
+      "title": "\ud83d\udc1b torch.compile silently bypasses device mismatch checks with torch.randperm() in index_add operations",
+      "url": "https://github.com/pytorch/pytorch/issues/172184",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "module: meta tensors",
+        "oncall: pt2",
+        "topic: fuzzer"
+      ],
+      "created_at": "2026-01-11T06:01:15Z",
+      "updated_at": "2026-01-12T02:35:16Z",
+      "comments": 1,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch",
+        "numerical_accuracy"
+      ],
+      "apis": [
+        "torch.Size",
+        "torch.compile",
+        "torch.index_add",
+        "torch.manual_seed",
+        "torch.nn",
+        "torch.nn.functional",
+        "torch.no_grad",
+        "torch.randn",
+        "torch.randperm"
+      ],
+      "has_repro": true,
+      "body_excerpt": "`torch.compile` silently bypasses device mismatch checks when using `torch.randperm()` with CUDA tensors in `index_add` operations. Eager mode correctly raises a `RuntimeError` about tensors being on different devices, but compiled mode executes silently.\n\nWhen `torch.randperm()` is called without specifying a device, it creates a CPU tensor by default. Using this CPU index tensor with CUDA tensors in `torch.index_add()` should raise an error, and does so in eager mode. However, `torch.compile` bypasses this safety check.\n\n## Minimal Reproducer\n\n```python\nimport torch",
+      "reproduction_class": [
+        "compiler_vs_eager",
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 86256,
+      "title": "inconsistent result of ```tf.image.adjust_hue``` on CPU and GPU",
+      "url": "https://github.com/tensorflow/tensorflow/issues/86256",
+      "state": "open",
+      "labels": [
+        "stat:contribution welcome",
+        "type:bug",
+        "comp:ops",
+        "TF 2.18"
+      ],
+      "created_at": "2025-01-31T07:40:34Z",
+      "updated_at": "2026-03-25T05:37:13Z",
+      "comments": 4,
+      "reactions": 1,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.Tensor",
+        "tf.abs",
+        "tf.constant",
+        "tf.device",
+        "tf.experimental.numpy.allclose",
+        "tf.float32",
+        "tf.image.adjust_hue",
+        "tf.reduce_max"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 86378,
+      "title": "inconsistent result of ```tf.raw_ops.BiasAddGrad``` on CPU and GPU",
+      "url": "https://github.com/tensorflow/tensorflow/issues/86378",
+      "state": "open",
+      "labels": [
+        "stat:contribution welcome",
+        "type:bug",
+        "comp:ops",
+        "TF 2.18"
+      ],
+      "created_at": "2025-02-01T10:43:06Z",
+      "updated_at": "2026-03-25T05:38:48Z",
+      "comments": 6,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.Tensor",
+        "tf.abs",
+        "tf.bfloat16",
+        "tf.cast",
+        "tf.constant",
+        "tf.device",
+        "tf.experimental.numpy.allclose",
+        "tf.float32",
+        "tf.raw_ops.BiasAddGrad",
+        "tf.reduce_max"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 96180,
+      "title": "Inconsistent `tf.math.reciprocal` Behavior for complex128 `inf` between CPU and GPU",
+      "url": "https://github.com/tensorflow/tensorflow/issues/96180",
+      "state": "open",
+      "labels": [
+        "stat:contribution welcome",
+        "type:bug",
+        "comp:ops",
+        "2.17"
+      ],
+      "created_at": "2025-06-30T09:18:50Z",
+      "updated_at": "2026-03-24T13:27:00Z",
+      "comments": 5,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "numerical_accuracy"
+      ],
+      "apis": [
+        "tf.Tensor",
+        "tf.constant",
+        "tf.device",
+        "tf.math.reciprocal"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 97204,
+      "title": "Inconsistent behavior for `tf.raw_ops.NotEqual` between CPU and GPU with non-broadcastable shapes",
+      "url": "https://github.com/tensorflow/tensorflow/issues/97204",
+      "state": "open",
+      "labels": [
+        "stat:contribution welcome",
+        "type:bug",
+        "comp:ops",
+        "TF 2.19"
+      ],
+      "created_at": "2025-07-18T22:33:09Z",
+      "updated_at": "2026-03-24T12:37:43Z",
+      "comments": 5,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.Tensor",
+        "tf.constant",
+        "tf.device",
+        "tf.float32",
+        "tf.raw_ops.NotEqual"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 86350,
+      "title": "inconsistent result of ```tf.raw_ops.BatchMatMulV2``` on CPU and GPU",
+      "url": "https://github.com/tensorflow/tensorflow/issues/86350",
+      "state": "open",
+      "labels": [
+        "stat:contribution welcome",
+        "type:bug",
+        "comp:ops",
+        "TF 2.18"
+      ],
+      "created_at": "2025-02-01T07:13:36Z",
+      "updated_at": "2026-03-25T05:37:47Z",
+      "comments": 4,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.Tensor",
+        "tf.abs",
+        "tf.bfloat16",
+        "tf.cast",
+        "tf.constant",
+        "tf.device",
+        "tf.experimental.numpy.allclose",
+        "tf.float32",
+        "tf.raw_ops.BatchMatMulV2",
+        "tf.reduce_max"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 109175,
+      "title": "Bug: `tf.nn.conv1d` shows inconsistent behavior between CPU and GPU for invalid parameters, failing to raise an error.",
+      "url": "https://github.com/tensorflow/tensorflow/issues/109175",
+      "state": "open",
+      "labels": [
+        "type:bug",
+        "comp:gpu",
+        "awaiting PR merge",
+        "TF 2.19"
+      ],
+      "created_at": "2026-01-30T01:22:41Z",
+      "updated_at": "2026-03-02T05:59:04Z",
+      "comments": 4,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "numerical_accuracy"
+      ],
+      "apis": [
+        "tf.__version__",
+        "tf.config.list_physical_devices",
+        "tf.device",
+        "tf.nn.conv1d",
+        "tf.random.normal"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 99759,
+      "title": "`tf.clip_by_value` produces inconsistent results for `-0.0` between CPU and GPU",
+      "url": "https://github.com/tensorflow/tensorflow/issues/99759",
+      "state": "open",
+      "labels": [
+        "type:bug",
+        "comp:ops",
+        "awaiting PR merge",
+        "2.17"
+      ],
+      "created_at": "2025-09-04T06:16:40Z",
+      "updated_at": "2025-09-11T16:13:41Z",
+      "comments": 4,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.clip_by_value",
+        "tf.constant",
+        "tf.device",
+        "tf.float32",
+        "tf.print"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 106602,
+      "title": "`tf.math.unsorted_segment_max` fails to propagate NaNs on GPU (inconsistent with CPU)",
+      "url": "https://github.com/tensorflow/tensorflow/issues/106602",
+      "state": "open",
+      "labels": [
+        "stat:contribution welcome",
+        "type:bug",
+        "comp:ops",
+        "awaiting PR merge",
+        "TF 2.19"
+      ],
+      "created_at": "2025-12-18T02:31:28Z",
+      "updated_at": "2026-03-26T05:58:56Z",
+      "comments": 3,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.__version__",
+        "tf.constant",
+        "tf.device",
+        "tf.float32",
+        "tf.int32",
+        "tf.math.unsorted_segment_max"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nNo\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 86506,
+      "title": "inconsistent result of ```tf.raw_ops.Tan``` on CPU and GPU",
+      "url": "https://github.com/tensorflow/tensorflow/issues/86506",
+      "state": "open",
+      "labels": [
+        "stat:contribution welcome",
+        "type:bug",
+        "comp:ops",
+        "TF 2.18"
+      ],
+      "created_at": "2025-02-04T03:18:15Z",
+      "updated_at": "2026-03-25T05:40:04Z",
+      "comments": 3,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.Tensor",
+        "tf.abs",
+        "tf.complex",
+        "tf.constant",
+        "tf.device",
+        "tf.experimental.numpy.allclose",
+        "tf.float32",
+        "tf.math.imag",
+        "tf.math.real",
+        "tf.raw_ops.Tan",
+        "tf.reduce_max"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 86406,
+      "title": "inconsistent result of ```tf.raw_ops.L2Loss``` on CPU and GPU",
+      "url": "https://github.com/tensorflow/tensorflow/issues/86406",
+      "state": "open",
+      "labels": [
+        "stat:contribution welcome",
+        "type:bug",
+        "comp:ops",
+        "TF 2.18"
+      ],
+      "created_at": "2025-02-02T07:05:17Z",
+      "updated_at": "2026-03-25T05:39:11Z",
+      "comments": 3,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.Tensor",
+        "tf.abs",
+        "tf.bfloat16",
+        "tf.cast",
+        "tf.constant",
+        "tf.device",
+        "tf.experimental.numpy.allclose",
+        "tf.float32",
+        "tf.raw_ops.L2Loss",
+        "tf.reduce_max"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 98410,
+      "title": "`tf.math.abs` returns inconsistent results for complex inf/nan inputs on CPU and GPU",
+      "url": "https://github.com/tensorflow/tensorflow/issues/98410",
+      "state": "open",
+      "labels": [
+        "stat:contribution welcome",
+        "type:bug",
+        "comp:ops",
+        "2.17"
+      ],
+      "created_at": "2025-08-06T13:45:58Z",
+      "updated_at": "2026-03-24T13:24:41Z",
+      "comments": 3,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.complex128",
+        "tf.constant",
+        "tf.device",
+        "tf.math.abs"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 94151,
+      "title": "Inconsistent Error Handling in `tf.raw_ops.SparseSegmentSumGradV2` Between CPU and GPU Implementations",
+      "url": "https://github.com/tensorflow/tensorflow/issues/94151",
+      "state": "open",
+      "labels": [
+        "type:bug",
+        "comp:ops",
+        "awaiting PR merge",
+        "TF 2.19"
+      ],
+      "created_at": "2025-05-26T16:54:29Z",
+      "updated_at": "2026-03-24T06:17:12Z",
+      "comments": 3,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.constant",
+        "tf.device",
+        "tf.float64",
+        "tf.int32",
+        "tf.int64",
+        "tf.raw_ops.SparseSegmentSumGradV2"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 94442,
+      "title": "`tf.math.cumprod` on `complex128` with `Inf` produces incorrect result on both CPU and GPU",
+      "url": "https://github.com/tensorflow/tensorflow/issues/94442",
+      "state": "open",
+      "labels": [
+        "stat:contribution welcome",
+        "type:bug",
+        "comp:ops",
+        "2.17"
+      ],
+      "created_at": "2025-05-29T13:08:31Z",
+      "updated_at": "2026-03-25T01:18:25Z",
+      "comments": 3,
+      "reactions": 0,
+      "categories": [
+        "numerical_accuracy"
+      ],
+      "apis": [
+        "tf.Tensor",
+        "tf.complex128",
+        "tf.constant",
+        "tf.device",
+        "tf.math.cumprod"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nNo\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 94378,
+      "title": "Inconsistent Error Handling in `tf.raw_ops.SparseToDense` Between CPU and GPU Implementations",
+      "url": "https://github.com/tensorflow/tensorflow/issues/94378",
+      "state": "open",
+      "labels": [
+        "stat:contribution welcome",
+        "type:bug",
+        "comp:ops",
+        "TF 2.19"
+      ],
+      "created_at": "2025-05-28T13:45:21Z",
+      "updated_at": "2026-03-25T06:02:34Z",
+      "comments": 2,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.constant",
+        "tf.device",
+        "tf.int32",
+        "tf.raw_ops.SparseToDense",
+        "tf.uint16"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 86607,
+      "title": "inconsistent result of ```tf.raw_ops.Rsqrt``` on CPU and GPU",
+      "url": "https://github.com/tensorflow/tensorflow/issues/86607",
+      "state": "open",
+      "labels": [
+        "stat:contribution welcome",
+        "type:bug",
+        "comp:ops",
+        "TF 2.18"
+      ],
+      "created_at": "2025-02-05T06:12:29Z",
+      "updated_at": "2026-03-25T05:40:51Z",
+      "comments": 2,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.Tensor",
+        "tf.abs",
+        "tf.bfloat16",
+        "tf.cast",
+        "tf.constant",
+        "tf.device",
+        "tf.experimental.numpy.allclose",
+        "tf.float32",
+        "tf.raw_ops.Rsqrt",
+        "tf.reduce_max"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 86434,
+      "title": "inconsistent result of ```tf.raw_ops.LogSoftmax``` on CPU and GPU",
+      "url": "https://github.com/tensorflow/tensorflow/issues/86434",
+      "state": "open",
+      "labels": [
+        "stat:contribution welcome",
+        "type:bug",
+        "comp:ops",
+        "TF 2.18"
+      ],
+      "created_at": "2025-02-03T03:30:58Z",
+      "updated_at": "2026-03-25T05:39:37Z",
+      "comments": 2,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.Tensor",
+        "tf.abs",
+        "tf.bfloat16",
+        "tf.cast",
+        "tf.constant",
+        "tf.device",
+        "tf.experimental.numpy.allclose",
+        "tf.float32",
+        "tf.raw_ops.LogSoftmax",
+        "tf.reduce_max"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 97125,
+      "title": "`tf.pow` returns inconsistent value on CPU vs GPU",
+      "url": "https://github.com/tensorflow/tensorflow/issues/97125",
+      "state": "open",
+      "labels": [
+        "stat:contribution welcome",
+        "type:bug",
+        "comp:ops",
+        "TF 2.19"
+      ],
+      "created_at": "2025-07-17T12:03:17Z",
+      "updated_at": "2026-03-24T13:03:24Z",
+      "comments": 2,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.Tensor",
+        "tf.__version__",
+        "tf.constant",
+        "tf.device",
+        "tf.int64",
+        "tf.pow"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 97102,
+      "title": "`tf.linalg.matrix_rank` produces inconsistent output on CPU vs GPU with `tol=6`",
+      "url": "https://github.com/tensorflow/tensorflow/issues/97102",
+      "state": "open",
+      "labels": [
+        "stat:contribution welcome",
+        "type:bug",
+        "comp:ops",
+        "TF 2.19"
+      ],
+      "created_at": "2025-07-17T07:27:47Z",
+      "updated_at": "2026-03-24T12:59:16Z",
+      "comments": 2,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.Tensor",
+        "tf.__version__",
+        "tf.device",
+        "tf.float64",
+        "tf.linalg.matrix_rank",
+        "tf.ones"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 94376,
+      "title": "Inconsistent Error Handling in `tf.raw_ops.SparseSegmentSqrtNGradV2` Between CPU and GPU Implementations",
+      "url": "https://github.com/tensorflow/tensorflow/issues/94376",
+      "state": "open",
+      "labels": [
+        "type:bug",
+        "comp:ops",
+        "awaiting PR merge",
+        "TF 2.19"
+      ],
+      "created_at": "2025-05-28T13:33:44Z",
+      "updated_at": "2026-03-24T06:17:28Z",
+      "comments": 2,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.constant",
+        "tf.device",
+        "tf.float64",
+        "tf.int32",
+        "tf.int64",
+        "tf.raw_ops.SparseSegmentSqrtNGradV2"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 116148,
+      "title": "Inconsistent outputs between CPU and GPU when combining dense + hashing + nonlinear ops",
+      "url": "https://github.com/tensorflow/tensorflow/issues/116148",
+      "state": "open",
+      "labels": [
+        "type:bug",
+        "comp:ops",
+        "comp:gpu",
+        "2.21.0"
+      ],
+      "created_at": "2026-04-17T06:30:14Z",
+      "updated_at": "2026-04-18T10:52:04Z",
+      "comments": 0,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.GradientTape",
+        "tf.device",
+        "tf.keras.Model",
+        "tf.keras.constraints.unit_norm",
+        "tf.keras.initializers.RandomUniform",
+        "tf.keras.layers.Activation",
+        "tf.keras.layers.Dense",
+        "tf.keras.layers.Hashing",
+        "tf.maximum",
+        "tf.metrics.Sum",
+        "tf.nn.swish",
+        "tf.zeros_like"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "cpu_vs_gpu"
+      ]
+    }
+  ],
+  "crash_or_internal_error": [
+    {
+      "repo": "pytorch/pytorch",
+      "number": 44282,
+      "title": "PyTorch wheel's own OpenMP library clashing with system-wide OpenMP library at runtime",
+      "url": "https://github.com/pytorch/pytorch/issues/44282",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "module: openmp"
+      ],
+      "created_at": "2020-09-07T15:38:54Z",
+      "updated_at": "2026-03-31T14:48:09Z",
+      "comments": 7,
+      "reactions": 14,
+      "categories": [
+        "numerical_accuracy"
+      ],
+      "apis": [],
+      "has_repro": true,
+      "body_excerpt": "## \ud83d\udc1b Bug\n\nOn MacOS Catalina with PyTorch installed with pip, when the same Python script imports both PyTorch and another package using also OpenMP, the Python interpreter crashes with the following message:\n\n`OMP: Error #15: Initializing libiomp5.dylib, but found libiomp5.dylib already initialized.\nOMP: Hint This means that multiple copies of the OpenMP runtime have been linked into the program. That is dangerous, since it can degrade performance or cause incorrect results. The best thing to do is to ensure that only a single OpenMP runtime is linked into the process, e.g. by avoiding static ",
+      "reproduction_class": [
+        "crash_or_internal_error"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 136390,
+      "title": "[c10d][nccl][cuda] Regression (unspecific cuda launch error) with test_c10d_nncl",
+      "url": "https://github.com/pytorch/pytorch/issues/136390",
+      "state": "open",
+      "labels": [
+        "oncall: distributed",
+        "module: nccl"
+      ],
+      "created_at": "2024-09-20T23:34:22Z",
+      "updated_at": "2025-05-13T18:22:27Z",
+      "comments": 12,
+      "reactions": 0,
+      "categories": [
+        "numerical_accuracy"
+      ],
+      "apis": [],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nWhen running \n python test/distributed/test_c10d_nccl.py -k test_nan_assert_float16 on a H100x2 platform, \n\nthe current nightly (and likely v2.5.0 RC) is producing the following cuda error: \n\n![image](https://github.com/user-attachments/assets/78e97651-b84c-4540-a370-879b0c9350a2)",
+      "reproduction_class": [
+        "crash_or_internal_error"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 124714,
+      "title": "`torch.distributed` hangs when using `torch.distributed.barrier` before any other communication primitives.",
+      "url": "https://github.com/pytorch/pytorch/issues/124714",
+      "state": "open",
+      "labels": [
+        "oncall: distributed",
+        "triaged"
+      ],
+      "created_at": "2024-04-23T07:47:18Z",
+      "updated_at": "2025-07-16T14:37:38Z",
+      "comments": 9,
+      "reactions": 0,
+      "categories": [
+        "distributed_mismatch"
+      ],
+      "apis": [
+        "torch.cuda.set_device",
+        "torch.distributed",
+        "torch.distributed.all_reduce",
+        "torch.distributed.barrier",
+        "torch.distributed.init_process_group",
+        "torch.distributed.launch",
+        "torch.rand"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nWhen running distributed program on multi-node and multi-device environment using the following scripts. (In my case, 2 nodes with 4 gpus each)\n\nrun_ddp.sh\n```bash\n#node 0\n",
+      "reproduction_class": [
+        "crash_or_internal_error"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 113408,
+      "title": "Early testing stop logic for CUDA error looks wrong for instantiated_test with pytest",
+      "url": "https://github.com/pytorch/pytorch/issues/113408",
+      "state": "open",
+      "labels": [
+        "module: cuda",
+        "triaged",
+        "module: testing"
+      ],
+      "created_at": "2023-11-10T01:59:44Z",
+      "updated_at": "2023-12-01T07:22:07Z",
+      "comments": 7,
+      "reactions": 0,
+      "categories": [
+        "numerical_accuracy"
+      ],
+      "apis": [
+        "torch.cuda.synchronize"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nSteps to reproduce:\n\n1. Make a CUDA illegal memory access (IMA) in `TestCommonCUDA::test_noncontiguous_samples_all_cuda_float32`. Maybe modify the source code or manually raise a CUDA error there.\n2. Run unit test with `python test/test_ops.py -v -k test_noncontiguous_samples_al` (note the ending is AL, not ALL). The test suite will terminate early with \"TEST SUITE EARLY TERMINATION due to torch.cuda.synchronize() failure\", as soon as `test_noncontiguous_samples_all_cuda_float32` fails.\n3. However, if we run unit test with `python test/test_ops.py -v -k test_noncontiguo",
+      "reproduction_class": [
+        "crash_or_internal_error"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 105872,
+      "title": "PyTorch 2.0.x `CUDA error: operation not supported` when `Tensor.to` a different device",
+      "url": "https://github.com/pytorch/pytorch/issues/105872",
+      "state": "open",
+      "labels": [
+        "needs reproduction",
+        "module: cuda",
+        "triaged",
+        "module: regression"
+      ],
+      "created_at": "2023-07-24T21:16:19Z",
+      "updated_at": "2023-07-31T17:14:56Z",
+      "comments": 6,
+      "reactions": 0,
+      "categories": [
+        "distributed_mismatch"
+      ],
+      "apis": [
+        "torch.Tensor",
+        "torch.randn"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nI've created an Azure VM with 2 A10 GPUs (`standard_nv72ads_a10_v5`). When running Hugging Face code to use both the GPUs, I've accountered `CUDA error: operation not supported`, and turns out it is reproducible with this PyTorch snippet.\n\n```python\nimport torch\n\na = torch.Tensor(torch.randn(5,5,5))",
+      "reproduction_class": [
+        "crash_or_internal_error"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 177829,
+      "title": "torch.lu_unpack crashes when LU_pivots is an empty tensor",
+      "url": "https://github.com/pytorch/pytorch/issues/177829",
+      "state": "open",
+      "labels": [
+        "module: crash",
+        "module: error checking",
+        "triaged",
+        "module: linear algebra",
+        "actionable",
+        "module: edge cases",
+        "bot-triaged",
+        "bot-mislabeled"
+      ],
+      "created_at": "2026-03-19T09:14:11Z",
+      "updated_at": "2026-03-19T22:25:17Z",
+      "comments": 2,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "torch.int32",
+        "torch.lu_unpack",
+        "torch.tensor"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nI encountered a bug in PyTorch when using the API torch.lu_unpack. The crash is triggered when the LU_pivots tensor is provided as an empty tensor, while the LU_data tensor has a defined shape. The code to reproduce this is as follows:\n\n```python\nimport torch\nLU_data = torch.tensor([[2., 3., 1.],\n                        [0.5, 1., 2.],",
+      "reproduction_class": [
+        "crash_or_internal_error"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 173574,
+      "title": "`torch.arange` triggers `SIGFPE` (Floating Point Exception) instead of RuntimeError when writing float results to `int64` out tensor",
+      "url": "https://github.com/pytorch/pytorch/issues/173574",
+      "state": "open",
+      "labels": [
+        "module: crash",
+        "module: error checking",
+        "triaged",
+        "module: edge cases"
+      ],
+      "created_at": "2026-01-27T22:38:10Z",
+      "updated_at": "2026-01-28T01:25:30Z",
+      "comments": 2,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "torch.__version__",
+        "torch.arange",
+        "torch.full",
+        "torch.int64"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nWhen using `torch.arange` with floating-point inputs (`start`, `end`, `step`) but providing an `out` tensor with `dtype=torch.int64`, the Python process crashes with a Floating Point Exception (`SIGFPE`).\n\nExpected behavior would be a `RuntimeError` explaining the dtype mismatch (e.g., \"Cannot write floating point results into Int64 tensor\") or a safe cast, rather than a hard crash of the interpreter.\n\n**Minimal reproduction**\n```python",
+      "reproduction_class": [
+        "crash_or_internal_error"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 178085,
+      "title": "DDP mode: CUDA error: an illegal memory access was encountered",
+      "url": "https://github.com/pytorch/pytorch/issues/178085",
+      "state": "open",
+      "labels": [
+        "needs reproduction",
+        "oncall: distributed",
+        "bot-triaged"
+      ],
+      "created_at": "2026-03-22T07:56:51Z",
+      "updated_at": "2026-03-24T21:22:32Z",
+      "comments": 2,
+      "reactions": 0,
+      "categories": [
+        "distributed_mismatch"
+      ],
+      "apis": [
+        "torch.backends.cudnn.benchmark",
+        "torch.cuda.device_count",
+        "torch.cuda.is_available",
+        "torch.cuda.set_device",
+        "torch.device",
+        "torch.distributed.get_rank",
+        "torch.manual_seed",
+        "torch.nn.parallel.DistributedDataParallel"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n**Error Analysis:**\nHello, my previous code worked normally with PyTorch version 2.1.0, but now with the multi-GPU setup in version 2.7.0, I encounter an error during DDP initialization:\n```\n[rank3]: File \"/root/code/model_prob/main_latent.py\", line 268, in <module>\n[rank3]: model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[local_rank],\n[rank3]: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+      "reproduction_class": [
+        "crash_or_internal_error"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 179883,
+      "title": "`torch.compile` crashes on `aten._assert_tensor_metadata.default`",
+      "url": "https://github.com/pytorch/pytorch/issues/179883",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "oncall: pt2",
+        "module: fakeTensor",
+        "module: pt2-dispatcher",
+        "bot-triaged"
+      ],
+      "created_at": "2026-04-10T01:27:37Z",
+      "updated_at": "2026-04-10T01:30:52Z",
+      "comments": 1,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch.Size",
+        "torch.Tensor",
+        "torch._dynamo.exc.TorchRuntimeError",
+        "torch.compile",
+        "torch.compiler.set_stance",
+        "torch.empty",
+        "torch.ops.aten._assert_tensor_metadata.default",
+        "torch.py"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\n```python\nimport torch\n\ndef f(x: torch.Tensor):\n    torch.ops.aten._assert_tensor_metadata.default(x, size=[10])\n",
+      "reproduction_class": [
+        "crash_or_internal_error"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 181384,
+      "title": "[aot_autograd] RuntimeError: /pytorch/build/aten/src/ATen/RegisterZeroTensor_0.cpp:254: SymIntArrayRef expected to contain only concrete integers when using torch.compile(dynamic=True) with torch.func.grad over GroupNorm",
+      "url": "https://github.com/pytorch/pytorch/issues/181384",
+      "state": "open",
+      "labels": [
+        "triaged",
+        "module: norms and normalization",
+        "oncall: pt2",
+        "module: functorch",
+        "module: dynamic shapes",
+        "module: aotdispatch",
+        "module: pt2-dispatcher",
+        "dynamo-functorch",
+        "bot-triaged"
+      ],
+      "created_at": "2026-04-24T15:29:44Z",
+      "updated_at": "2026-04-24T15:37:04Z",
+      "comments": 0,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch._dynamo.exc.BackendCompilerFailed",
+        "torch.abs",
+        "torch.allclose",
+        "torch.autograd.grad",
+        "torch.compile",
+        "torch.func",
+        "torch.func.grad",
+        "torch.isfinite",
+        "torch.manual_seed",
+        "torch.nn",
+        "torch.nn.functional",
+        "torch.randn"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nWhen composing `torch.func.grad` with `torch.compile(dynamic=True)` over a function containing `nn.GroupNorm`, the inductor backend crashes during AOT autograd graph capture with `RuntimeError: /pytorch/build/aten/src/ATen/RegisterZeroTensor_0.cpp:254: SymIntArrayRef expected to contain only concrete integers`. The same function works correctly under eager execution, static compilation (dynamic=False), torch.func.grad without torch.compile, and torch.func.grad with torch.compile.\n```python\nimport os as _os, tempfile as _tmp\n_os.environ.setdefault(\n    'TORCHINDUCTOR_CAC",
+      "reproduction_class": [
+        "crash_or_internal_error"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 181266,
+      "title": "[inductor] CPP kernel AssertionError: unexpected group: ((12, 14, 10), ()) != (168, 10), () when flatten followed by BatchNorm1d compiled on CPU",
+      "url": "https://github.com/pytorch/pytorch/issues/181266",
+      "state": "open",
+      "labels": [
+        "triage review",
+        "oncall: pt2",
+        "module: inductor",
+        "oncall: cpu inductor",
+        "bot-triaged"
+      ],
+      "created_at": "2026-04-23T18:44:18Z",
+      "updated_at": "2026-04-23T18:48:46Z",
+      "comments": 0,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch._inductor.exc.InductorError",
+        "torch.clamp",
+        "torch.compile",
+        "torch.exp",
+        "torch.flatten",
+        "torch.manual_seed",
+        "torch.nn",
+        "torch.nn.Module",
+        "torch.nn.functional",
+        "torch.nn.functional.batch_norm",
+        "torch.nn.functional.instance_norm",
+        "torch.nn.functional.rrelu",
+        "torch.randn"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nTorchInductor crashes during compilation with an ```AssertionError: unexpected group``` when running a model that applies flatten followed by elementwise ops and BatchNorm1d.\nThe failure happens in the C++ codegen stage with a shape grouping mismatch:\n```((12, 14, 10), ()) != (168, 10), ()```\nEven though the FX graph shows the tensor flattened to shape [12, 140] before BatchNorm1d, Inductor appears to incorrectly group dimensions during scheduling/codegen.\n\n```python",
+      "reproduction_class": [
+        "compiler_vs_eager",
+        "crash_or_internal_error"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 181177,
+      "title": "[aot_autograd] RuntimeError: derivative for aten::_scaled_dot_product_flash_attention_for_cpu_backward is not implemented",
+      "url": "https://github.com/pytorch/pytorch/issues/181177",
+      "state": "open",
+      "labels": [
+        "module: cpu",
+        "triaged",
+        "oncall: pt2",
+        "module: functorch",
+        "module: aotdispatch",
+        "module: pt2-dispatcher",
+        "dynamo-functorch",
+        "module: sdpa",
+        "bot-triaged"
+      ],
+      "created_at": "2026-04-22T22:12:23Z",
+      "updated_at": "2026-04-22T22:15:40Z",
+      "comments": 0,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch._dynamo.exc.BackendCompilerFailed",
+        "torch.allclose",
+        "torch.autograd.grad",
+        "torch.compile",
+        "torch.func",
+        "torch.func.grad",
+        "torch.manual_seed",
+        "torch.nn",
+        "torch.nn.functional",
+        "torch.randn"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nWhen composing `torch.func.grad` with `torch.compile()` over a function containing `LayerNorm -> RReLU -> scaled_dot_product_attention`, the inductor backend crashes during AOT autograd graph capture with `RuntimeError: derivative for aten::_scaled_dot_product_flash_attention_for_cpu_backward is not implemented`. The same function works correctly under eager execution.\n```python\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nimport torch.func as _torch_func",
+      "reproduction_class": [
+        "crash_or_internal_error"
+      ]
+    },
+    {
+      "repo": "pytorch/pytorch",
+      "number": 181115,
+      "title": "[inductor] torch.compile(dynamic=True) crashes in TorchInductor CPU codegen with AttributeError: 'StrictLessThan' object has no attribute 'diff'",
+      "url": "https://github.com/pytorch/pytorch/issues/181115",
+      "state": "open",
+      "labels": [
+        "module: crash",
+        "module: cpu",
+        "triaged",
+        "oncall: pt2",
+        "module: dynamic shapes",
+        "module: inductor",
+        "oncall: cpu inductor",
+        "bot-triaged"
+      ],
+      "created_at": "2026-04-22T14:58:31Z",
+      "updated_at": "2026-04-22T15:02:20Z",
+      "comments": 0,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch",
+        "jit_eager_mismatch"
+      ],
+      "apis": [
+        "torch._inductor.exc.InductorError",
+        "torch.allclose",
+        "torch.compile",
+        "torch.func",
+        "torch.func.grad",
+        "torch.isfinite",
+        "torch.manual_seed",
+        "torch.nn",
+        "torch.nn.functional",
+        "torch.randn"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### \ud83d\udc1b Describe the bug\n\nWhen compiling a function that uses torch.func.grad with torch.compile(..., dynamic=True), TorchInductor's CPU backend crashes during vectorization tiling selection with:\n```\ntorch._inductor.exc.InductorError: AttributeError: 'StrictLessThan' object has no attribute 'diff'\n```\n\ncrash starts from this part of the code:",
+      "reproduction_class": [
+        "crash_or_internal_error"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 76726,
+      "title": "Aborted (core dumped) in `tf.io.encode_png`/`tf.compat.v1.image.encode_png`",
+      "url": "https://github.com/tensorflow/tensorflow/issues/76726",
+      "state": "open",
+      "labels": [
+        "stat:awaiting tensorflower",
+        "type:bug",
+        "comp:ops",
+        "2.17"
+      ],
+      "created_at": "2024-09-28T12:49:42Z",
+      "updated_at": "2024-11-06T06:31:18Z",
+      "comments": 3,
+      "reactions": 0,
+      "categories": [
+        "numerical_accuracy"
+      ],
+      "apis": [
+        "tf.cast",
+        "tf.compat.v1.image.encode_png",
+        "tf.io.encode_png",
+        "tf.tile",
+        "tf.uint8"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "crash_or_internal_error"
+      ]
+    },
+    {
+      "repo": "tensorflow/tensorflow",
+      "number": 76729,
+      "title": "Aborted (core dumped) in `tf.raw_ops.ResourceScatterNdop`",
+      "url": "https://github.com/tensorflow/tensorflow/issues/76729",
+      "state": "open",
+      "labels": [
+        "stat:awaiting tensorflower",
+        "type:bug",
+        "comp:ops",
+        "2.17"
+      ],
+      "created_at": "2024-09-28T13:09:06Z",
+      "updated_at": "2024-10-17T09:00:28Z",
+      "comments": 1,
+      "reactions": 0,
+      "categories": [
+        "cpu_gpu_mismatch"
+      ],
+      "apis": [
+        "tf.Variable",
+        "tf.int32",
+        "tf.raw_ops.ResourceScatterNdAdd",
+        "tf.raw_ops.ResourceScatterNdMax",
+        "tf.raw_ops.ResourceScatterNdMin",
+        "tf.raw_ops.ResourceScatterNdSub",
+        "tf.raw_ops.ResourceScatterNdUpdate",
+        "tf.raw_ops.ResourceScatterNdop",
+        "tf.zeros"
+      ],
+      "has_repro": true,
+      "body_excerpt": "### Issue type\n\nBug\n\n### Have you reproduced the bug with TensorFlow Nightly?\n\nYes\n",
+      "reproduction_class": [
+        "crash_or_internal_error"
+      ]
+    }
+  ]
+}
